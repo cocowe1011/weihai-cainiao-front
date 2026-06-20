@@ -2994,7 +2994,7 @@ export default {
         const bindList = (queue.trayInfo || []).map((tray) => {
           const pkgNo = tray.packageNo || '';
           return {
-            materialCategoryCode: '1',
+            materialCategoryCode: 'M1',
             materialDataCode: pkgNo,
             attributeList: [
               { attributeCode: 'weight', attributeValue: '0' },
