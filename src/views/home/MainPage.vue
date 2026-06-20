@@ -2994,7 +2994,7 @@ export default {
         const bindList = (queue.trayInfo || []).map((tray) => {
           const pkgNo = tray.packageNo || '';
           return {
-            materialCategoryCode: 'M1',
+            materialCategoryCode: '1',
             materialDataCode: pkgNo,
             attributeList: [
               { attributeCode: 'weight', attributeValue: '0' },
@@ -3008,11 +3008,11 @@ export default {
           // 触发源类型固定：2-工位
           signalSourceType: 2,
           // 信号值（任务类型），固定2
-          signalTriggerValue: 2,
-          // 触发源（下料点点位编号，1~13的分拣口编号）
-          signalSourceValues: [String(portNo)],
+          signalTriggerValue: 4,
+          // 触发源（下料点点位编号，GW01~GW13的分拣口编号）
+          signalSourceValues: [`GW${String(portNo).padStart(2, '0')}`],
           // 载具类型，固定T1
-          carrierTypeCode: 'T1',
+          carrierTypeCode: '1',
           materialBind: { bindList }
         };
         const res = await HttpUtilMcs.post(
