@@ -3038,10 +3038,7 @@ export default {
             const dbTrayStatus = queueData.trayStatus || '';
 
             // 以数据库状态为准，根据 dbTrayStatus 直接执行对应动作
-            if (dbTrayStatus === '1') {
-              // AGV已取货完成 → 记录日志
-              this.addLog(`分拣口${queueIndex} AGV取货完成，等待空托盘返回`);
-            } else if (dbTrayStatus === '2') {
+            if (dbTrayStatus === '2') {
               // AGV已送空托盘回来 → 解除PLC禁止进货命令
               this.addLog(`分拣口${queueIndex} AGV空托盘已返回，解除禁止进货`);
               this.clearPlcForbidPort(queueIndex);
