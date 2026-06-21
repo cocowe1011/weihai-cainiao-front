@@ -1622,9 +1622,6 @@ export default {
       sixScanProcessing: false,
       // 六面扫Socket连接状态
       sixScanSocketConnected: false,
-      // 六面扫条码是否有效（单一条码为有效，[NoRead]和多码为无效）
-      // 启动时无有效扫描，初始为 false
-      sixScanBarcodeValid: false,
       // 分拣口配置（1-9大件，10-11小件，12-13异常口）
       sortPortConfig: [
         {
@@ -2151,95 +2148,7 @@ export default {
     }
   },
   watch: {
-    sixScanBarcode(newVal) {
-      const barcode = (newVal || '').trim();
-      if (!barcode) {
-        return;
-      }
-
-      // NoRead 判断（关键字识别）
-      if (barcode.indexOf('NoRead') !== -1) {
-        this.sixScanBarcodeValid = false;
-        this.nowScanTrayInfo = {};
-        this.addLog(
-          `六面扫未读到条码（${this.lastProcessedBarcode}），报警：条码无效，等待目的地请求时写0`,
-          'alarm'
-        );
-        return;
-      }
-
-      // 多码判断（逗号分隔 或 [xxxx][xxxx] 格式）
-      const parts = barcode.split(',');
-      if (parts.length > 1) {
-        this.sixScanBarcodeValid = false;
-        this.nowScanTrayInfo = {};
-        this.addLog(
-          `六面扫读到多个条码（${this.lastProcessedBarcode}），报警：条码无效，不发送目的地`,
-          'alarm'
-        );
-        return;
-      }
-      // 多码判断：[xxxx][xxxx] 格式（包含多个方括号段视为多码）
-      const bracketMatches = barcode.match(/\[[^\]]*\]/g);
-      if (bracketMatches && bracketMatches.length >= 2) {
-        this.sixScanBarcodeValid = false;
-        this.nowScanTrayInfo = {};
-        this.addLog(
-          `六面扫读到多码格式条码（${this.lastProcessedBarcode}），报警：条码无效，不发送目的地`,
-          'alarm'
-        );
-        return;
-      }
-
-      // 单码重复检测：先查上货区队列中是否已有同 packageNo 的条目
-      const existingIndex = this.queues[0].trayInfo.findIndex(
-        (item) => item.packageNo === barcode
-      );
-      if (existingIndex !== -1) {
-        // 已入队，用新扫码数据替换老信息
-        const packageInfo = mockPackageByBarcode(barcode);
-        const oldItem = this.queues[0].trayInfo[existingIndex];
-        this.queues[0].trayInfo.splice(existingIndex, 1, {
-          ...oldItem,
-          packageNo: packageInfo.packageNo,
-          trayTime: moment().format('YYYY-MM-DD HH:mm:ss'),
-          businessNo: packageInfo.businessNo,
-          customerSource: packageInfo.customerSource,
-          batchNo: packageInfo.batchNo,
-          destinationCountry: packageInfo.destinationCountry,
-          channel: packageInfo.channel
-        });
-        this.addLog(
-          `六面扫条码重复，已替换队列中老信息：${barcode} -> 大包号：${packageInfo.packageNo}`
-        );
-        // 同步更新当前展示信息
-        this.nowScanTrayInfo = packageInfo;
-        this.sixScanBarcodeValid = true;
-        if (this.selectedQueueIndex === 0) {
-          this.showTrays(0);
-        }
-        return;
-      }
-
-      // 未入队但已缓存在 nowScanTrayInfo 中，更新缓存
-      if (this.nowScanTrayInfo.barcode === barcode) {
-        const packageInfo = mockPackageByBarcode(barcode);
-        this.nowScanTrayInfo = packageInfo;
-        this.addLog(`六面扫条码重复，已更新缓存信息：${barcode}`);
-        return;
-      }
-
-      this.sixScanBarcodeValid = true;
-      this.addLog(`[处理后]六面扫识别条码：${barcode}`);
-      // 仅mock数据并缓存到nowScanTrayInfo，等待DBW16.bit0信号
-      const packageInfo = mockPackageByBarcode(barcode);
-      this.nowScanTrayInfo = packageInfo; // 直接存完整包裹信息（含packageSize等字段）
-      this.addLog(
-        `已缓存包裹信息，大包号：${packageInfo.packageNo}，大小：${
-          packageInfo.packageSize || '未知'
-        }，等待目的地请求信号`
-      );
-    },
+    // sixScanBarcode 不再监听，所有判断和mock处理移至 handleDestinationRequest 中统一处理
     'wcsDockWord16.bit0'(newVal, oldVal) {
       // 上升沿检测：0 -> 1 表示PLC请求下发目的地
       if (newVal === '1' && oldVal === '0') {
@@ -2753,31 +2662,82 @@ export default {
       }
     },
     // 目的地请求处理入口（DBW16.bit0上升沿触发）
+    // 不再依赖 sixScanBarcode watch 缓存，直接拿当前条码进行判断和mock处理
     async handleDestinationRequest() {
-      // 检查条码是否有效（NoRead/多码时给目的地写0）
-      if (!this.sixScanBarcodeValid) {
+      const barcode = (this.sixScanBarcode || '').trim();
+
+      // 1. 条码为空
+      if (!barcode) {
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
+        this.addLog('收到目的地请求信号，但当前无条码数据，目的地写0', 'alarm');
+        return;
+      }
+
+      // 2. NoRead 判断（关键字识别）
+      if (barcode.indexOf('NoRead') !== -1) {
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
         this.addLog(
-          '收到目的地请求信号，但当前六面扫条码无效（NoRead或多码），目的地写0',
+          `收到目的地请求信号，六面扫未读到条码（${barcode}），报警：条码无效，目的地写0`,
           'alarm'
         );
         return;
       }
-      // 检查是否有缓存的包裹信息
-      if (
-        !this.nowScanTrayInfo ||
-        !this.nowScanTrayInfo.packageNo ||
-        !this.nowScanTrayInfo.barcode
-      ) {
+
+      // 3. 多码判断（逗号分隔）
+      const parts = barcode.split(',');
+      if (parts.length > 1) {
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
-        this.addLog('收到目的地请求信号，但无缓存包裹信息，目的地写0');
+        this.addLog(
+          `收到目的地请求信号，六面扫读到多个条码（${barcode}），报警：条码无效，目的地写0`,
+          'alarm'
+        );
         return;
       }
-      const packageInfo = this.nowScanTrayInfo;
-      const barcode = packageInfo.barcode;
+      // 多码判断：[xxxx][xxxx] 格式
+      const bracketMatches = barcode.match(/\[[^\]]*\]/g);
+      if (bracketMatches && bracketMatches.length >= 2) {
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
+        this.addLog(
+          `收到目的地请求信号，六面扫读到多码格式条码（${barcode}），报警：条码无效，目的地写0`,
+          'alarm'
+        );
+        return;
+      }
+
+      // 4. 单码重复检测：查上货区队列中是否已有同 packageNo 的条目
+      const existingIndex = this.queues[0].trayInfo.findIndex(
+        (item) => item.packageNo === barcode
+      );
+      if (existingIndex !== -1) {
+        // 已入队，用新扫码数据替换老信息
+        const packageInfo = mockPackageByBarcode(barcode);
+        const oldItem = this.queues[0].trayInfo[existingIndex];
+        this.queues[0].trayInfo.splice(existingIndex, 1, {
+          ...oldItem,
+          packageNo: packageInfo.packageNo,
+          trayTime: moment().format('YYYY-MM-DD HH:mm:ss'),
+          businessNo: packageInfo.businessNo,
+          customerSource: packageInfo.customerSource,
+          batchNo: packageInfo.batchNo,
+          destinationCountry: packageInfo.destinationCountry,
+          channel: packageInfo.channel
+        });
+        this.addLog(
+          `目的地请求：条码重复，已替换队列中老信息：${barcode} -> 大包号：${packageInfo.packageNo}`
+        );
+        this.nowScanTrayInfo = packageInfo;
+        if (this.selectedQueueIndex === 0) {
+          this.showTrays(0);
+        }
+        // 替换后仍需分配目的地，继续往下走
+      }
+
+      // 5. Mock包裹数据
+      const packageInfo = mockPackageByBarcode(barcode);
+      this.nowScanTrayInfo = packageInfo;
       const packageSize = packageInfo.packageSize || 'large';
       this.addLog(
-        `收到目的地请求信号，开始处理，大包号：${packageInfo.packageNo}，大小：${packageSize}`
+        `收到目的地请求信号，条码：${barcode}，大包号：${packageInfo.packageNo}，大小：${packageSize}`
       );
 
       try {
@@ -2863,9 +2823,9 @@ export default {
         this.$message.success(
           `大包 ${packageInfo.packageNo} 已分配至分拣口${port.portNo}`
         );
-        // 处理成功后清空缓存，防止PLC重复信号导致同一包裹重复处理
+        // 处理成功后清空缓存和条码，防止PLC重复信号导致同一包裹重复处理
         this.nowScanTrayInfo = {};
-        this.sixScanBarcodeValid = false;
+        this.sixScanBarcode = '';
       } catch (error) {
         console.error('目的地请求处理失败:', error);
         this.$message.error(`目的地请求处理失败：${error.message || '请重试'}`);
