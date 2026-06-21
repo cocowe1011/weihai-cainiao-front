@@ -2669,6 +2669,9 @@ export default {
       // 1. 条码为空
       if (!barcode) {
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
+        setTimeout(() => {
+          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+        }, 2000);
         this.addLog('收到目的地请求信号，但当前无条码数据，目的地写0', 'alarm');
         return;
       }
@@ -2676,6 +2679,9 @@ export default {
       // 2. NoRead 判断（关键字识别）
       if (barcode.indexOf('NoRead') !== -1) {
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
+        setTimeout(() => {
+          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+        }, 2000);
         this.addLog(
           `收到目的地请求信号，六面扫未读到条码（${barcode}），报警：条码无效，目的地写0`,
           'alarm'
@@ -2687,6 +2693,9 @@ export default {
       const parts = barcode.split(',');
       if (parts.length > 1) {
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
+        setTimeout(() => {
+          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+        }, 2000);
         this.addLog(
           `收到目的地请求信号，六面扫读到多个条码（${barcode}），报警：条码无效，目的地写0`,
           'alarm'
@@ -2697,6 +2706,9 @@ export default {
       const bracketMatches = barcode.match(/\[[^\]]*\]/g);
       if (bracketMatches && bracketMatches.length >= 2) {
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
+        setTimeout(() => {
+          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+        }, 2000);
         this.addLog(
           `收到目的地请求信号，六面扫读到多码格式条码（${barcode}），报警：条码无效，目的地写0`,
           'alarm'
@@ -2783,10 +2795,16 @@ export default {
 
         // 5. 写入目的地 DB1001.DBW8
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', destinationCode);
+        setTimeout(() => {
+          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+        }, 2000);
         this.addLog(`已写入目的地编码：${destinationCode}`);
 
         // 6. 写入虚拟ID DB1001.DBB10-39
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBB10', barcode);
+        setTimeout(() => {
+          ipcRenderer.send('cancelWriteToPLC', 'W_DBB10');
+        }, 2000);
         this.addLog(`已写入虚拟ID（条码）：${barcode}`);
 
         // 7. 保存订单到 order_info
