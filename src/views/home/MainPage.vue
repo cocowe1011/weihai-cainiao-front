@@ -286,7 +286,7 @@
                   class="marker label-left"
                   :class="{ scanning: photoelectricSignal1.bit5 === '1' }"
                   data-x="600"
-                  data-y="1030"
+                  data-y="1015"
                   @click="toggleBitValue(photoelectricSignal1, 'bit5')"
                 >
                   <div class="marker-label">01006</div>
@@ -296,7 +296,7 @@
                   class="marker label-left"
                   :class="{ scanning: photoelectricSignal1.bit6 === '1' }"
                   data-x="595"
-                  data-y="1110"
+                  data-y="1090"
                   @click="toggleBitValue(photoelectricSignal1, 'bit6')"
                 >
                   <div class="marker-label">01007</div>
@@ -306,7 +306,7 @@
                   class="marker label-left"
                   :class="{ scanning: photoelectricSignal1.bit7 === '1' }"
                   data-x="590"
-                  data-y="1185"
+                  data-y="1155"
                   @click="toggleBitValue(photoelectricSignal1, 'bit7')"
                 >
                   <div class="marker-label">01008</div>
@@ -315,8 +315,8 @@
                 <div
                   class="marker label-right"
                   :class="{ scanning: photoelectricSignal1.bit8 === '1' }"
-                  data-x="700"
-                  data-y="1253"
+                  data-x="760"
+                  data-y="1210"
                   @click="toggleBitValue(photoelectricSignal1, 'bit8')"
                 >
                   <div class="marker-label">01009</div>
@@ -325,8 +325,8 @@
                 <div
                   class="marker label-left"
                   :class="{ scanning: photoelectricSignal1.bit9 === '1' }"
-                  data-x="590"
-                  data-y="1330"
+                  data-x="593"
+                  data-y="1338"
                   @click="toggleBitValue(photoelectricSignal1, 'bit9')"
                 >
                   <div class="marker-label">01010</div>
@@ -635,7 +635,7 @@
                 </div>
                 <!-- 01009 -->
                 <div
-                  class="motor-marker marker-show-label label-right"
+                  class="motor-marker marker-show-label label-left"
                   :class="{ running: motorRunningWord6.bit8 === '1' }"
                   data-x="639"
                   data-y="1210"
@@ -648,7 +648,7 @@
                   class="motor-marker marker-show-label label-left"
                   :class="{ running: motorRunningWord6.bit9 === '1' }"
                   data-x="637"
-                  data-y="1270"
+                  data-y="1278"
                   @click="toggleBitValue(motorRunningWord6, 'bit9')"
                 >
                   <div class="marker-label">01010</div>
