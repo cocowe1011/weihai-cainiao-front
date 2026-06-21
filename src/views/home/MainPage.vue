@@ -2281,7 +2281,7 @@ export default {
       });
     });
     // 启动 MCS/AGV 队列状态轮询
-    // this.startMcsPolling();
+    this.startMcsPolling();
     // 六面扫TCP直连（不再通过background.js中转）
     this.connectSixScan();
     ipcRenderer.on('receivedMsg', (event, values, values2) => {
@@ -3045,9 +3045,10 @@ export default {
               // AGV已送空托盘回来 → 解除PLC禁止进货命令
               this.addLog(`分拣口${queueIndex} AGV空托盘已返回，解除禁止进货`);
               this.clearPlcForbidPort(queueIndex);
+              // 前端解锁：清空所有AGV状态
+              queue.isLock = '';
+              queue.trayStatus = '';
             }
-            // 所有状态均同步后端trayStatus，不手动修改isLock/trayStatus
-            queue.trayStatus = dbTrayStatus;
           });
         })
         .catch((err) => {
@@ -3252,7 +3253,21 @@ export default {
           type: 'warning'
         })
           .then(() => {
-            // 把所有的队列，初试状态都清空
+            // 先处理锁定的分拣口：解锁 + 发送PLC解锁信号
+            this.queues.forEach((queue, index) => {
+              if (queue.isLock === '1') {
+                // 发送PLC解除禁止进货信号
+                this.clearPlcForbidPort(index);
+                this.addLog(
+                  `全线清空：分拣口${index}已锁定，执行解锁`,
+                  'running'
+                );
+                // 解锁：清空AGV状态字段，触发监听器更新数据库
+                this.$set(queue, 'isLock', '');
+                this.$set(queue, 'trayStatus', '');
+              }
+            });
+            // 把所有的队列、初始状态都清空（复制新数组触发监听器）
             this.queues.forEach((queue) => {
               queue.trayInfo = [];
             });
