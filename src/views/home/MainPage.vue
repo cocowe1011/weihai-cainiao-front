@@ -2991,18 +2991,15 @@ export default {
       );
 
       // 1. 发送PLC分拣口禁止进货命令 DB1001.DBW102 对应位
-      // 构建禁止进货位值：将对应bit置1
-      let dbw102Value = 0;
-      for (let i = 1; i <= 13; i++) {
-        const q = this.queues[i];
-        if (q && (q.isLock === '1' || i === queueIndex)) {
-          dbw102Value |= 1 << (i - 1);
-        }
-      }
-      ipcRenderer.send('writeSingleValueToPLC', 'W_DBW102', dbw102Value);
+      // 直接写对应分拣口的禁止进货位为 true，延迟后取消持续写入
+      const forbidBitAdd = `W_DBW102_BIT${queueIndex - 1}`;
+      ipcRenderer.send('writeSingleValueToPLC', forbidBitAdd, true);
       this.addLog(
-        `已发送PLC禁止进货命令 DBW102=${dbw102Value}（分拣口${portNo}）`
+        `已发送PLC禁止进货命令 ${forbidBitAdd}=true（分拣口${portNo}）`
       );
+      setTimeout(() => {
+        ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
+      }, 2000);
 
       // 2. 锁定队列
       queue.isLock = '1';
@@ -3099,15 +3096,12 @@ export default {
     },
     // 解除PLC某分拣口的禁止进货命令（将该分拣口对应的DBW102位清零）
     clearPlcForbidPort(queueIndex) {
-      let dbw102Value = 0;
-      for (let i = 1; i <= 13; i++) {
-        const q = this.queues[i];
-        if (q && q.isLock === '1' && i !== queueIndex) {
-          dbw102Value |= 1 << (i - 1);
-        }
-      }
-      ipcRenderer.send('writeSingleValueToPLC', 'W_DBW102', dbw102Value);
-      this.addLog(`已解除分拣口${queueIndex}禁止进货，DBW102=${dbw102Value}`);
+      const forbidBitAdd = `W_DBW102_BIT${queueIndex - 1}`;
+      ipcRenderer.send('writeSingleValueToPLC', forbidBitAdd, false);
+      this.addLog(`已解除分拣口${queueIndex}禁止进货，${forbidBitAdd}=false`);
+      setTimeout(() => {
+        ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
+      }, 2000);
     },
     // 分拣口分配算法
     allocateSortPort(packageSize) {
