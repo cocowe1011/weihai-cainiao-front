@@ -2157,24 +2157,35 @@ export default {
         return;
       }
 
-      // NoRead 判断
-      if (barcode === 'NoRead') {
+      // NoRead 判断（关键字识别）
+      if (barcode.indexOf('NoRead') !== -1) {
         this.sixScanBarcodeValid = false;
         this.nowScanTrayInfo = {};
         this.addLog(
-          `六面扫未读到条码（${this.lastProcessedBarcode}），报警：条码无效，不发送目的地`,
+          `六面扫未读到条码（${this.lastProcessedBarcode}），报警：条码无效，等待目的地请求时写0`,
           'alarm'
         );
         return;
       }
 
-      // 多码判断
+      // 多码判断（逗号分隔 或 [xxxx][xxxx] 格式）
       const parts = barcode.split(',');
       if (parts.length > 1) {
         this.sixScanBarcodeValid = false;
         this.nowScanTrayInfo = {};
         this.addLog(
           `六面扫读到多个条码（${this.lastProcessedBarcode}），报警：条码无效，不发送目的地`,
+          'alarm'
+        );
+        return;
+      }
+      // 多码判断：[xxxx][xxxx] 格式（包含多个方括号段视为多码）
+      const bracketMatches = barcode.match(/\[[^\]]*\]/g);
+      if (bracketMatches && bracketMatches.length >= 2) {
+        this.sixScanBarcodeValid = false;
+        this.nowScanTrayInfo = {};
+        this.addLog(
+          `六面扫读到多码格式条码（${this.lastProcessedBarcode}），报警：条码无效，不发送目的地`,
           'alarm'
         );
         return;
@@ -2219,7 +2230,7 @@ export default {
       }
 
       this.sixScanBarcodeValid = true;
-      this.addLog(`六面扫识别条码：${barcode}`);
+      this.addLog(`[处理后]六面扫识别条码：${barcode}`);
       // 仅mock数据并缓存到nowScanTrayInfo，等待DBW16.bit0信号
       const packageInfo = mockPackageByBarcode(barcode);
       this.nowScanTrayInfo = packageInfo; // 直接存完整包裹信息（含packageSize等字段）
@@ -2670,7 +2681,14 @@ export default {
       // 始终显示原始数据到面板（去掉首尾方括号），由 watch 统一判断
       this.lastProcessedBarcode = rawStr.replace(/^\[|\]$/g, '');
 
-      // 提取方括号内容，赋值给 sixScanBarcode 触发 watch 统一处理
+      // 多码格式预检：[xxxx][xxxx]（含多个方括号段）直接传原始串，让 watch 拦截
+      const bracketSegments = rawStr.match(/\[[^\]]*\]/g);
+      if (bracketSegments && bracketSegments.length >= 2) {
+        this.sixScanBarcode = rawStr; // 保留原始格式，触发 watch 多码检测
+        return;
+      }
+
+      // 单码：提取方括号内容，赋值给 sixScanBarcode 触发 watch 统一处理
       let innerContent = rawStr;
       if (rawStr.startsWith('[') && rawStr.endsWith(']')) {
         innerContent = rawStr.slice(1, -1);
@@ -2736,10 +2754,11 @@ export default {
     },
     // 目的地请求处理入口（DBW16.bit0上升沿触发）
     async handleDestinationRequest() {
-      // 检查条码是否有效（NoRead/多码时不发送目的地）
+      // 检查条码是否有效（NoRead/多码时给目的地写0）
       if (!this.sixScanBarcodeValid) {
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
         this.addLog(
-          '收到目的地请求信号，但当前六面扫条码无效（NoRead或多码），拒绝发送目的地',
+          '收到目的地请求信号，但当前六面扫条码无效（NoRead或多码），目的地写0',
           'alarm'
         );
         return;
@@ -2750,7 +2769,8 @@ export default {
         !this.nowScanTrayInfo.packageNo ||
         !this.nowScanTrayInfo.barcode
       ) {
-        this.addLog('收到目的地请求信号，但无缓存包裹信息，跳过');
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
+        this.addLog('收到目的地请求信号，但无缓存包裹信息，目的地写0');
         return;
       }
       const packageInfo = this.nowScanTrayInfo;
@@ -3060,28 +3080,17 @@ export default {
             const queue = this.queues[queueIndex];
             const dbTrayStatus = queueData.trayStatus || '';
 
-            // 检测状态变化：后端trayStatus变为"1"（AGV已取货完成）→ 只更新显示
-            if (queue.trayStatus === '0' && dbTrayStatus === '1') {
+            // 以数据库状态为准，根据 dbTrayStatus 直接执行对应动作
+            if (dbTrayStatus === '1') {
+              // AGV已取货完成 → 记录日志
               this.addLog(`分拣口${queueIndex} AGV取货完成，等待空托盘返回`);
-            }
-            // 检测状态变化：后端trayStatus变为"2"（AGV已送空托盘回来）→ 前端执行解锁
-            if (
-              (queue.trayStatus === '0' || queue.trayStatus === '1') &&
-              dbTrayStatus === '2' &&
-              queue.isLock === '1'
-            ) {
-              this.addLog(
-                `分拣口${queueIndex} AGV空托盘已返回，前端执行解锁，允许再次进货`
-              );
-              // 解除PLC禁止进货命令
+            } else if (dbTrayStatus === '2') {
+              // AGV已送空托盘回来 → 解除PLC禁止进货命令
+              this.addLog(`分拣口${queueIndex} AGV空托盘已返回，解除禁止进货`);
               this.clearPlcForbidPort(queueIndex);
-              // 前端解锁：清空所有AGV状态，watcher自动同步后端
-              queue.isLock = '';
-              queue.trayStatus = '';
-            } else {
-              // 其他情况同步后端trayStatus到前端
-              queue.trayStatus = dbTrayStatus;
             }
+            // 所有状态均同步后端trayStatus，不手动修改isLock/trayStatus
+            queue.trayStatus = dbTrayStatus;
           });
         })
         .catch((err) => {
