@@ -1575,6 +1575,8 @@ export default {
       sixScanBarcode: '',
       lastProcessedBarcode: '',
       sixScanProcessing: false,
+      // 目的地请求限流时间戳（2秒内重复信号不处理）
+      lastDestinationReqTime: 0,
       // 六面扫Socket连接状态
       sixScanSocketConnected: false,
       // 分拣口配置（1-9大件，10-11小件，12-13异常口）
@@ -2089,6 +2091,13 @@ export default {
     'wcsDockWord16.bit0'(newVal, oldVal) {
       // 上升沿检测：0 -> 1 表示PLC请求下发目的地
       if (newVal === '1' && oldVal === '0') {
+        // 限流：2秒内重复请求不处理
+        const now = Date.now();
+        if (now - this.lastDestinationReqTime < 2000) {
+          this.addLog('目的地请求信号限流：2秒内重复触发，已忽略', 'alarm');
+          return;
+        }
+        this.lastDestinationReqTime = now;
         this.handleDestinationRequest();
       }
     },
@@ -2640,27 +2649,15 @@ export default {
         (item) => item.packageNo === barcode
       );
       if (existingIndex !== -1) {
-        // 已入队，用新扫码数据替换老信息
-        const packageInfo = mockPackageByBarcode(barcode);
-        const oldItem = this.queues[0].trayInfo[existingIndex];
-        this.queues[0].trayInfo.splice(existingIndex, 1, {
-          ...oldItem,
-          packageNo: packageInfo.packageNo,
-          trayTime: moment().format('YYYY-MM-DD HH:mm:ss'),
-          businessNo: packageInfo.businessNo,
-          customerSource: packageInfo.customerSource,
-          batchNo: packageInfo.batchNo,
-          destinationCountry: packageInfo.destinationCountry,
-          channel: packageInfo.channel
-        });
+        // 已入队，删除老条目，使其不再参与分拣口负载计算，后续当作新包裹重新分配
+        const oldItem = this.queues[0].trayInfo.splice(existingIndex, 1)[0];
         this.addLog(
-          `目的地请求：条码重复，已替换队列中老信息：${barcode} -> 大包号：${packageInfo.packageNo}`
+          `目的地请求：条码重复，已移除队列中老信息（原分拣口：${oldItem.allocatedPortNo}）：${barcode}，将按新包裹重新分配`
         );
-        this.nowScanTrayInfo = packageInfo;
         if (this.selectedQueueIndex === 0) {
           this.showTrays(0);
         }
-        // 替换后仍需分配目的地，继续往下走
+        // 老条目已移除，继续往下走，按新包裹分配目的地并入队
       }
 
       // 5. Mock包裹数据
@@ -2760,9 +2757,6 @@ export default {
         this.$message.success(
           `大包 ${packageInfo.packageNo} 已分配至分拣口${port.portNo}`
         );
-        // 处理成功后清空缓存和条码，防止PLC重复信号导致同一包裹重复处理
-        this.nowScanTrayInfo = {};
-        this.sixScanBarcode = '';
       } catch (error) {
         console.error('目的地请求处理失败:', error);
         this.$message.error(`目的地请求处理失败：${error.message || '请重试'}`);
