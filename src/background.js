@@ -491,7 +491,6 @@ function conPLC() {
           conn.addItems('DBW14'); // 光电信号--2
           conn.addItems('DBW16'); // 对接WCS信号
           conn.addItems('DBW18'); // 对接WCS信号
-          conn.addItems('DBW20'); // 反馈WCS信号
           // 反馈WCS写虚拟ID（DB1000.DBB298-717，每段 char(30)）
           conn.addItems('DBB298'); // 分拣口01进货ID
           conn.addItems('DBB328'); // 分拣口02进货ID
@@ -576,7 +575,6 @@ var variables = {
   DBW14: 'DB1000,INT14', // 光电信号--2
   DBW16: 'DB1000,INT16', // 对接WCS信号
   DBW18: 'DB1000,INT18', // 对接WCS信号
-  DBW20: 'DB1000,INT20', // 反馈WCS信号
   DBB298: 'DB1000,S298.28', // 分拣口01进货ID
   DBB328: 'DB1000,S328.28', // 分拣口02进货ID
   DBB358: 'DB1000,S358.28', // 分拣口03进货ID

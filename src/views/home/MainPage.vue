@@ -1368,51 +1368,6 @@
               </el-button>
             </div>
           </div>
-          <!-- DBW20 分拣口进货成功脉冲测试 -->
-          <div class="test-section">
-            <span class="test-label">DBW20 分拣口进货成功:</span>
-            <div class="qrcode-test-container qrcode-btn-grid">
-              <el-button size="small" @click="triggerSortPortEntry(1)">
-                口1
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(2)">
-                口2
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(3)">
-                口3
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(4)">
-                口4
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(5)">
-                口5
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(6)">
-                口6
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(7)">
-                口7
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(8)">
-                口8
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(9)">
-                口9
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(10)">
-                口10
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(11)">
-                口11
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(12)">
-                口12
-              </el-button>
-              <el-button size="small" @click="triggerSortPortEntry(13)">
-                口13
-              </el-button>
-            </div>
-          </div>
           <!-- DBW18 分拣口呼叫空托测试 -->
           <div class="test-section">
             <span class="test-label">DBW18 分拣口呼叫空托(AGV):</span>
@@ -2049,24 +2004,6 @@ export default {
         bit10: '0',
         bit11: '0'
       },
-      // DBW20 分拣口进货成功
-      wcsFeedbackWord20: {
-        bit0: '0',
-        bit1: '0',
-        bit2: '0',
-        bit3: '0',
-        bit4: '0',
-        bit5: '0',
-        bit6: '0',
-        bit7: '0',
-        bit8: '0',
-        bit9: '0',
-        bit10: '0',
-        bit11: '0',
-        bit12: '0',
-        bit13: '0',
-        bit14: '0'
-      },
       // 反馈WCS写虚拟ID
       sortPort01TrayId: '',
       sortPort02TrayId: '',
@@ -2155,69 +2092,69 @@ export default {
         this.handleDestinationRequest();
       }
     },
-    // DBW20 分拣口进货成功 上升沿检测（bit0~bit12 对应分拣口1~13）
-    'wcsFeedbackWord20.bit0'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    // 分拣口虚拟ID变化检测（sortPort01TrayId~sortPort13TrayId 对应分拣口1~13）
+    sortPort01TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(1);
       }
     },
-    'wcsFeedbackWord20.bit1'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort02TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(2);
       }
     },
-    'wcsFeedbackWord20.bit2'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort03TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(3);
       }
     },
-    'wcsFeedbackWord20.bit3'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort04TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(4);
       }
     },
-    'wcsFeedbackWord20.bit4'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort05TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(5);
       }
     },
-    'wcsFeedbackWord20.bit5'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort06TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(6);
       }
     },
-    'wcsFeedbackWord20.bit6'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort07TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(7);
       }
     },
-    'wcsFeedbackWord20.bit7'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort08TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(8);
       }
     },
-    'wcsFeedbackWord20.bit8'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort09TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(9);
       }
     },
-    'wcsFeedbackWord20.bit9'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort10TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(10);
       }
     },
-    'wcsFeedbackWord20.bit10'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort11TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(11);
       }
     },
-    'wcsFeedbackWord20.bit11'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort12TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(12);
       }
     },
-    'wcsFeedbackWord20.bit12'(newVal, oldVal) {
-      if (newVal === '1' && oldVal === '0') {
+    sortPort13TrayId(newVal) {
+      if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(13);
       }
     },
@@ -2434,24 +2371,6 @@ export default {
       this.wcsDockWord18.bit9 = getBit(word18, 1);
       this.wcsDockWord18.bit10 = getBit(word18, 2);
       this.wcsDockWord18.bit11 = getBit(word18, 3);
-
-      // DBW20 分拣口进货成功
-      let word20 = this.convertToWord(values.DBW20 ?? 0);
-      this.wcsFeedbackWord20.bit0 = getBit(word20, 8);
-      this.wcsFeedbackWord20.bit1 = getBit(word20, 9);
-      this.wcsFeedbackWord20.bit2 = getBit(word20, 10);
-      this.wcsFeedbackWord20.bit3 = getBit(word20, 11);
-      this.wcsFeedbackWord20.bit4 = getBit(word20, 12);
-      this.wcsFeedbackWord20.bit5 = getBit(word20, 13);
-      this.wcsFeedbackWord20.bit6 = getBit(word20, 14);
-      this.wcsFeedbackWord20.bit7 = getBit(word20, 15);
-      this.wcsFeedbackWord20.bit8 = getBit(word20, 0);
-      this.wcsFeedbackWord20.bit9 = getBit(word20, 1);
-      this.wcsFeedbackWord20.bit10 = getBit(word20, 2);
-      this.wcsFeedbackWord20.bit11 = getBit(word20, 3);
-      this.wcsFeedbackWord20.bit12 = getBit(word20, 4);
-      this.wcsFeedbackWord20.bit13 = getBit(word20, 5);
-      this.wcsFeedbackWord20.bit14 = getBit(word20, 6);
 
       // 反馈WCS写虚拟ID
       this.sortPort01TrayId = values.DBB298 ?? '';
@@ -2854,7 +2773,7 @@ export default {
         );
       }
     },
-    // 分拣口进货成功处理：DBW20 bit上升沿 → 取进货ID → 从上货区移入对应分拣口队列
+    // 分拣口进货处理：虚拟ID变化 → 取进货ID → 从上货区移入对应分拣口队列
     handleSortPortEntrySuccess(portNo) {
       // 1. 根据分拣口号获取对应的进货ID（大包号，即六面扫条码号）
       const sortPortIdMap = {
@@ -2965,25 +2884,10 @@ export default {
       this.addLog(
         `分拣口${portNo}${
           isManual ? '手动' : '收到空托信号'
-        }呼叫AGV，开始锁定并通知取货`
+        }呼叫AGV，开始通知取货`
       );
 
-      // 1. 发送PLC分拣口禁止进货命令 DB1001.DBW102 对应位
-      // 直接写对应分拣口的禁止进货位为 true，延迟后取消持续写入
-      const forbidBitAdd = `W_DBW102_BIT${queueIndex - 1}`;
-      ipcRenderer.send('writeSingleValueToPLC', forbidBitAdd, true);
-      this.addLog(
-        `已发送PLC禁止进货命令 ${forbidBitAdd}=true（分拣口${portNo}）`
-      );
-      setTimeout(() => {
-        ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
-      }, 2000);
-
-      // 2. 锁定队列
-      queue.isLock = '1';
-      queue.trayStatus = '0';
-
-      // 3. 调用MCS接口通知AGV取货
+      // 1. 调用MCS接口通知AGV取货（必须成功才继续后续操作）
       try {
         // 队列有多少包就生成多少个bindList
         const bindList = (queue.trayInfo || []).map((tray) => {
@@ -3014,6 +2918,17 @@ export default {
           '/mcs/api/v2/task/receiveSignal',
           mcsPayload
         );
+        // 判断接口返回是否真正成功（success为true且code为"0"）
+        if (!res || res.success === false) {
+          const errCode = (res && res.code) || '未知';
+          const errMsg = (res && res.message) || '未知错误';
+          this.addLog(
+            `MCS接口调用失败，分拣口${portNo}，错误码：${errCode}，原因：${errMsg}`,
+            'alarm'
+          );
+          // 接口调用失败，不往下继续执行
+          return;
+        }
         this.addLog(`MCS接口调用成功，分拣口${portNo}，通知AGV取货`);
       } catch (err) {
         console.error('MCS接口调用失败:', err);
@@ -3023,9 +2938,22 @@ export default {
           }`,
           'alarm'
         );
-        // 即使MCS调用失败也保持锁定状态，等待手动处理
+        // 网络异常，不继续执行
+        return;
       }
-      // AGV状态已通过队列watcher自动同步后端，无需手动调用
+
+      // 2. 锁定队列（MCS成功后更新WCS队列状态）
+      this.syncAgvStatusToBackend(queue.id, '0', '1');
+
+      // 3. 发送PLC分拣口禁止进货命令 DB1001.DBW102 对应位
+      const forbidBitAdd = `W_DBW102_BIT${queueIndex - 1}`;
+      ipcRenderer.send('writeSingleValueToPLC', forbidBitAdd, true);
+      this.addLog(
+        `已发送PLC禁止进货命令 ${forbidBitAdd}=true（分拣口${portNo}）`
+      );
+      setTimeout(() => {
+        ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
+      }, 2000);
     },
     // 启动 MCS/AGV 队列状态轮询
     startMcsPolling() {
@@ -3043,7 +2971,7 @@ export default {
         this.mcsPollingTimer = null;
       }
     },
-    // 轮询队列AGV状态（只查trayStatus/isLock）
+    // 轮询队列AGV状态（同步数据库状态到前端，防止前端缓存过期覆盖后端）
     pollQueueAgvStatus() {
       HttpUtil.post('/queue_info/queryQueueList', {})
         .then((res) => {
@@ -3054,15 +2982,32 @@ export default {
             if (queueIndex < 1 || queueIndex >= this.queues.length) return; // 跳过上货区(id=1)
             const queue = this.queues[queueIndex];
             const dbTrayStatus = queueData.trayStatus || '';
+            const dbIsLock = queueData.isLock || '';
+
+            // 同步数据库状态到前端，防止前端缓存过期被watcher覆盖回后端
+            queue.trayStatus = dbTrayStatus;
+            queue.isLock = dbIsLock;
 
             // 以数据库状态为准，根据 dbTrayStatus 直接执行对应动作
             if (dbTrayStatus === '2') {
               // AGV已送空托盘回来 → 解除PLC禁止进货命令
-              this.addLog(`分拣口${queueIndex} AGV空托盘已返回，解除禁止进货`);
+              // 前端解锁：直接传值更新后端，成功后同步前端缓存
+              this.syncAgvStatusToBackend(queueId, '', '');
               this.clearPlcForbidPort(queueIndex);
-              // 前端解锁：清空所有AGV状态
-              queue.isLock = '';
-              queue.trayStatus = '';
+              // 清空该分拣口队列数据（AGV已取走货物，空托返回后队列应清空，watcher会自动同步后端）
+              queue.trayInfo = [];
+              // 刷新当前选中队列的显示
+              if (
+                this.selectedQueueIndex === queueIndex ||
+                this.selectedQueueIndex === 0
+              ) {
+                this.$nextTick(() => {
+                  this.showTrays(this.selectedQueueIndex);
+                });
+              }
+              this.addLog(
+                `分拣口${queueIndex} AGV空托盘已返回，解除禁止进货,分拣口${queueIndex} 队列数据已清空`
+              );
             }
           });
         })
@@ -3114,18 +3059,6 @@ export default {
       setTimeout(() => {
         this.wcsDockWord16.bit0 = '0';
         this.addLog('DBW16.bit0 已恢复为 0');
-      }, 1000);
-    },
-    // 手动模拟 DBW20 分拣口进货成功脉冲（测试用）
-    triggerSortPortEntry(portNo) {
-      const bitKey = `bit${portNo - 1}`;
-      this.wcsFeedbackWord20[bitKey] = '1';
-      this.addLog(
-        `手动触发 DBW20.${bitKey} = 1（分拣口${portNo}进货成功，1秒后恢复）`
-      );
-      setTimeout(() => {
-        this.wcsFeedbackWord20[bitKey] = '0';
-        this.addLog(`DBW20.${bitKey} 已恢复为 0`);
       }, 1000);
     },
     // 手动模拟 DBW18 分拣口呼叫空托信号（测试用）
@@ -3277,9 +3210,8 @@ export default {
                   `全线清空：分拣口${index}已锁定，执行解锁`,
                   'running'
                 );
-                // 解锁：清空AGV状态字段，触发监听器更新数据库
-                this.$set(queue, 'isLock', '');
-                this.$set(queue, 'trayStatus', '');
+                // 解锁：直接传值更新后端，成功后同步前端缓存
+                this.syncAgvStatusToBackend(queue.id, '', '');
               }
             });
             // 把所有的队列、初始状态都清空（复制新数组触发监听器）
@@ -3681,8 +3613,8 @@ export default {
         type: 'warning'
       })
         .then(() => {
-          this.$set(queue, 'isLock', '0');
-          // watcher 会自动触发 updateQueueInfo，无需手动调用
+          // 只更新isLock，不覆盖trayStatus
+          this.syncAgvStatusToBackend(queueId, null, '0');
           this.addLog(`队列「${queue.queueName}」已解锁`, 'running');
           this.$message.success(`队列「${queue.queueName}」已解锁`);
         })
@@ -3726,21 +3658,34 @@ export default {
         return value; // 非负数保持不变
       }
     },
-    // 更新数据库队列信息（trayInfo + AGV状态字段）
+    // 更新数据库队列信息（仅同步trayInfo，AGV状态字段由syncAgvStatusToBackend单独控制）
+    // 更新数据库队列信息
     updateQueueInfo(id) {
-      const queue = this.queues[id - 1];
       const param = {
         id: id,
-        trayInfo: JSON.stringify(queue.trayInfo)
+        trayInfo: JSON.stringify(this.queues[id - 1].trayInfo)
       };
-      // 分拣口队列（id >= 2）额外同步AGV状态字段
-      if (id >= 2) {
-        param.trayStatus = queue.trayStatus || '';
-        param.isLock = queue.isLock || '';
-      }
       HttpUtil.post('/queue_info/update', param).catch((err) => {
-        console.error('更新队列信息失败:', err);
+        this.$message.error(err);
       });
+    },
+    // 同步AGV状态字段到后端，后端更新成功后再同步前端缓存
+    // 与updateQueueInfo分离，避免Vue watcher将前端缓存的旧状态覆盖后端AGV回调写入的新状态
+    // 未传入的字段（null/undefined）不会更新，避免覆盖后端已有值
+    syncAgvStatusToBackend(queueId, trayStatus, isLock) {
+      const param = { id: queueId };
+      if (trayStatus != null) param.trayStatus = trayStatus;
+      if (isLock != null) param.isLock = isLock;
+      HttpUtil.post('/queue_info/update', param)
+        .then(() => {
+          // 后端更新成功后同步前端缓存（只更新传入的字段）
+          const queue = this.queues[queueId - 1];
+          if (trayStatus != null) queue.trayStatus = trayStatus;
+          if (isLock != null) queue.isLock = isLock;
+        })
+        .catch((err) => {
+          console.error('同步AGV状态到后端失败:', err);
+        });
     },
     // 从数据库加载队列信息
     loadQueueInfoFromDatabase() {
