@@ -2053,7 +2053,9 @@ export default {
         M1020: 0
       },
       // AGV/MCS轮询定时器
-      mcsPollingTimer: null
+      mcsPollingTimer: null,
+      // 数据准备就绪标志位
+      isDataReady: false
     };
   },
   computed: {
@@ -2089,6 +2091,7 @@ export default {
   watch: {
     // sixScanBarcode 不再监听，所有判断和mock处理移至 handleDestinationRequest 中统一处理
     'wcsDockWord16.bit0'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       // 上升沿检测：0 -> 1 表示PLC请求下发目的地
       if (newVal === '1' && oldVal === '0') {
         // 限流：2秒内重复请求不处理
@@ -2103,72 +2106,86 @@ export default {
     },
     // 分拣口虚拟ID变化检测（sortPort01TrayId~sortPort13TrayId 对应分拣口1~13）
     sortPort01TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(1);
       }
     },
     sortPort02TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(2);
       }
     },
     sortPort03TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(3);
       }
     },
     sortPort04TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(4);
       }
     },
     sortPort05TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(5);
       }
     },
     sortPort06TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(6);
       }
     },
     sortPort07TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(7);
       }
     },
     sortPort08TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(8);
       }
     },
     sortPort09TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(9);
       }
     },
     sortPort10TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(10);
       }
     },
     sortPort11TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(11);
       }
     },
     sortPort12TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(12);
       }
     },
     sortPort13TrayId(newVal) {
+      if (!this.isDataReady) return;
       if ((newVal || '').trim()) {
         this.handleSortPortEntrySuccess(13);
       }
     },
     // M1009皮带工位条码变化：查询上货队列并剔除
     'beltStationIds.M1009'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       const barcode = (newVal || '').trim();
       if (!barcode) return;
       // 防止重复触发（值未真正变化）
@@ -2199,42 +2216,55 @@ export default {
     },
     // DBW18 分拣口呼叫空托 上升沿检测（bit0~bit12 对应分拣口1~13）
     'wcsDockWord18.bit0'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(1);
     },
     'wcsDockWord18.bit1'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(2);
     },
     'wcsDockWord18.bit2'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(3);
     },
     'wcsDockWord18.bit3'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(4);
     },
     'wcsDockWord18.bit4'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(5);
     },
     'wcsDockWord18.bit5'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(6);
     },
     'wcsDockWord18.bit6'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(7);
     },
     'wcsDockWord18.bit7'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(8);
     },
     'wcsDockWord18.bit8'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(9);
     },
     'wcsDockWord18.bit9'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(10);
     },
     'wcsDockWord18.bit10'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(11);
     },
     'wcsDockWord18.bit11'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(12);
     },
     'wcsDockWord18.bit12'(newVal, oldVal) {
+      if (!this.isDataReady) return;
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(13);
     }
   },
@@ -2456,6 +2486,11 @@ export default {
       this.beltStationDests.M1019 = values.DBW1220 ?? 0;
       this.beltStationDests.M1020 = values.DBW1222 ?? 0;
     });
+    // 给PLC数据加载时间
+    setTimeout(() => {
+      this.addLog('isDataReady数据加载完成');
+      this.isDataReady = true;
+    }, 3000);
   },
   methods: {
     // 六面扫TCP直连（在渲染进程直接建立Socket，不通过background.js中转）
