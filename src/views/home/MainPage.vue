@@ -1218,21 +1218,21 @@
                   size="mini"
                   type="warning"
                   style="margin-left: 4px"
-                  >等待AGV</el-tag
+                  >等待AGV取货</el-tag
                 >
                 <el-tag
                   v-else-if="queue.trayStatus === '1'"
                   size="mini"
                   type="info"
                   style="margin-left: 4px"
-                  >AGV取货完成，等待空托返回</el-tag
+                  >AGV取货完成</el-tag
                 >
                 <el-tag
                   v-else-if="queue.trayStatus === '2'"
                   size="mini"
                   type="success"
                   style="margin-left: 4px"
-                  >空托已返回，解锁中</el-tag
+                  >空托已返回</el-tag
                 >
               </div>
             </div>
@@ -5119,6 +5119,7 @@ export default {
               display: flex;
               justify-content: space-between;
               align-items: center;
+              flex-wrap: nowrap;
               background: rgba(48, 65, 85, 0.9);
               border-radius: 8px;
               padding: 12px 15px;
@@ -5126,6 +5127,11 @@ export default {
               cursor: pointer;
               transition: all 0.3s ease;
               border: 1px solid rgba(255, 255, 255, 0.15);
+
+              .queue-name {
+                flex-shrink: 0;
+              }
+
               .tray-count {
                 background: rgba(255, 255, 255, 0.1);
                 color: rgba(255, 255, 255, 0.7);
@@ -5134,6 +5140,19 @@ export default {
                 border-radius: 10px;
                 min-width: 24px;
                 text-align: center;
+                flex-shrink: 0;
+              }
+
+              .el-tag {
+                flex-shrink: 1;
+                min-width: 0;
+                max-width: 130px;
+                overflow: hidden;
+                .el-tag__content {
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  white-space: nowrap;
+                }
               }
             }
 
