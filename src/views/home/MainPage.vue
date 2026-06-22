@@ -2167,6 +2167,36 @@ export default {
         this.handleSortPortEntrySuccess(13);
       }
     },
+    // M1009皮带工位条码变化：查询上货队列并剔除
+    'beltStationIds.M1009'(newVal, oldVal) {
+      const barcode = (newVal || '').trim();
+      if (!barcode) return;
+      // 防止重复触发（值未真正变化）
+      if (barcode === (oldVal || '').trim()) return;
+      // 在上货区队列（queues[0]）中按 packageNo 查找
+      const idx = this.queues[0].trayInfo.findIndex(
+        (item) => item.packageNo === barcode
+      );
+      if (idx !== -1) {
+        const removed = this.queues[0].trayInfo.splice(idx, 1)[0];
+        this.addLog(
+          `M1009剔除：条码 ${barcode} 已从上货队列中移除（大包号：${
+            removed.packageNo
+          }，原分拣口：${removed.allocatedPortNo || '--'}，队列剩余 ${
+            this.queues[0].trayInfo.length
+          } 件）`,
+          'alarm'
+        );
+        if (this.selectedQueueIndex === 0) {
+          this.showTrays(0);
+        }
+      } else {
+        this.addLog(
+          `M1009剔除：条码 ${barcode} 在上货队列中未找到匹配记录`,
+          'alarm'
+        );
+      }
+    },
     // DBW18 分拣口呼叫空托 上升沿检测（bit0~bit12 对应分拣口1~13）
     'wcsDockWord18.bit0'(newVal, oldVal) {
       if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(1);
