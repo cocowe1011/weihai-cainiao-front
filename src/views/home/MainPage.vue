@@ -1268,6 +1268,16 @@
                         <span class="tray-detail">{{
                           tray.channel || '--'
                         }}</span>
+                        <span
+                          class="tray-detail allocated-port"
+                          v-if="tray.allocatedPortNo"
+                          >目的地：分拣口{{ tray.allocatedPortNo }}</span
+                        >
+                        <span
+                          class="tray-detail destination-code"
+                          v-if="tray.destinationCode"
+                          >编码：{{ tray.destinationCode }}</span
+                        >
                       </div>
                       <div class="tray-info-row">
                         <span class="tray-detail"
@@ -2183,37 +2193,6 @@ export default {
         this.handleSortPortEntrySuccess(13);
       }
     },
-    // M1009皮带工位条码变化：查询上货队列并剔除
-    'beltStationIds.M1009'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      const barcode = (newVal || '').trim();
-      if (!barcode) return;
-      // 防止重复触发（值未真正变化）
-      if (barcode === (oldVal || '').trim()) return;
-      // 在上货区队列（queues[0]）中按 packageNo 查找
-      const idx = this.queues[0].trayInfo.findIndex(
-        (item) => item.packageNo === barcode
-      );
-      if (idx !== -1) {
-        const removed = this.queues[0].trayInfo.splice(idx, 1)[0];
-        this.addLog(
-          `M1009剔除：条码 ${barcode} 已从上货队列中移除（大包号：${
-            removed.packageNo
-          }，原分拣口：${removed.allocatedPortNo || '--'}，队列剩余 ${
-            this.queues[0].trayInfo.length
-          } 件）`,
-          'alarm'
-        );
-        if (this.selectedQueueIndex === 0) {
-          this.showTrays(0);
-        }
-      } else {
-        this.addLog(
-          `M1009剔除：条码 ${barcode} 在上货队列中未找到匹配记录`,
-          'alarm'
-        );
-      }
-    },
     // DBW18 分拣口呼叫空托 上升沿检测（bit0~bit12 对应分拣口1~13）
     'wcsDockWord18.bit0'(newVal, oldVal) {
       if (!this.isDataReady) return;
@@ -2618,7 +2597,6 @@ export default {
         if (!savedOrder || savedOrder.id == null) {
           throw new Error((res && res.message) || '保存订单失败');
         }
-        this.addLog(`订单已写入 order_info，ID：${savedOrder.id}`);
 
         const queueItem = {
           orderInfoId: savedOrder.id,
@@ -2764,29 +2742,25 @@ export default {
           sequenceNo,
           isLast
         );
-        this.addLog(
-          `分配分拣口${port.portNo}（${
-            port.sizeType === 'large' ? '大件' : '小件'
-          }），分拣机${port.machineNo}，方向${
-            port.direction === 1 ? '下(奇)' : '上(偶)'
-          }，流水号${sequenceNo}，${
-            isLast ? '最后一件' : '普通'
-          }，目的地编码：${destinationCode}`
-        );
 
         // 5. 写入目的地 DB1001.DBW8
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', destinationCode);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
         }, 2000);
-        this.addLog(`已写入目的地编码：${destinationCode}`);
 
         // 6. 写入虚拟ID DB1001.DBB10-39
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBB10', barcode);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBB10');
         }, 2000);
-        this.addLog(`已写入虚拟ID（条码）：${barcode}`);
+        this.addLog(
+          `分配分拣口${port.portNo}（${
+            port.sizeType === 'large' ? '大件' : '小件'
+          }），分拣机${port.machineNo}，流水号${sequenceNo}，${
+            isLast ? '最后一件' : '普通'
+          }，目的地编码：${destinationCode},已写入目的地编码：${destinationCode}，已写入虚拟ID（条码）：${barcode},分拣口当前包裹数量：${portQueueCount}，上货区包裹数量：${loadingQueueCount}`
+        );
 
         // 7. 保存订单到 order_info
         const payload = toOrderInfoPayload(packageInfo);
@@ -2795,7 +2769,6 @@ export default {
         if (!savedOrder || savedOrder.id == null) {
           throw new Error((res && res.message) || '保存订单失败');
         }
-        this.addLog(`订单已写入 order_info，ID：${savedOrder.id}`);
 
         // 8. 构建队列项，加入上货区队列（queues[0]）
         const queueItem = {
@@ -2808,7 +2781,8 @@ export default {
           destinationCountry: packageInfo.destinationCountry,
           channel: packageInfo.channel,
           trayStatus: '1',
-          allocatedPortNo: port.portNo // 记录分配的分拣口号，用于负载统计
+          allocatedPortNo: port.portNo, // 记录分配的分拣口号，用于负载统计
+          destinationCode: destinationCode // 记录发送的目的地编码
         };
         this.queues[0].trayInfo.push(queueItem);
 
@@ -2853,29 +2827,31 @@ export default {
 
       const trayIdKey = sortPortIdMap[portNo];
       if (!trayIdKey) {
-        this.addLog(`分拣口${portNo}进货成功信号无效，portNo超出范围`);
+        this.addLog(`分拣口${portNo}虚拟ID变化信号无效，portNo超出范围`);
         return;
       }
 
       const entryId = (this[trayIdKey] || '').trim();
       if (!entryId) {
         this.addLog(
-          `分拣口${portNo}进货成功，但进货ID为空（${trayIdKey}），跳过处理`
+          `分拣口${portNo}虚拟ID变化，但进货ID为空（${trayIdKey}），跳过处理`
         );
         return;
       }
 
-      this.addLog(`分拣口${portNo}进货成功，进货ID（大包号）：${entryId}`);
+      this.addLog(`分拣口${portNo}虚拟ID变化，进货ID（大包号）：${entryId}`);
 
-      // 2. 在上货区队列（queues[0]）中查找匹配的包裹
+      // 2. 在上货区队列（queues[0]）中查找匹配的包裹（条码匹配 + 目的地匹配本分拣口）
       const loadingQueue = this.queues[0];
       const trayIndex = loadingQueue.trayInfo.findIndex(
-        (item) => (item.packageNo || '').trim() === entryId
+        (item) =>
+          (item.packageNo || '').trim() === entryId &&
+          item.allocatedPortNo === portNo
       );
 
       if (trayIndex === -1) {
         this.addLog(
-          `分拣口${portNo}进货成功，但在上货区未找到大包号 ${entryId} 的包裹，跳过`
+          `分拣口${portNo}虚拟ID变化，但上货区未找到大包号 ${entryId} 且目的地为分拣口${portNo} 的包裹，跳过`
         );
         return;
       }
@@ -3092,23 +3068,39 @@ export default {
       // 按portNo从小到大排序
       candidates.sort((a, b) => a.portNo - b.portNo);
 
-      for (const port of candidates) {
-        const queueId = port.portNo + 1;
-        const portQueue = this.queues.find((q) => q.id === queueId);
-        // 已锁定的分拣口不参与分配（AGV取货中或已锁定）
-        if (portQueue && portQueue.isLock === '1') {
-          continue;
-        }
-        const portQueueCount = portQueue ? portQueue.trayInfo.length : 0;
-        // 上货区中已分配该口目的地的包裹数量
-        const loadingQueueCount = this.queues[0].trayInfo.filter(
-          (item) => item.allocatedPortNo === port.portNo
-        ).length;
-        const currentLoad = portQueueCount + loadingQueueCount;
-        if (currentLoad < port.maxCapacity) {
-          return port;
-        }
+      // 计算每个分拣口的当前负载
+      const portLoads = candidates
+        .map((port) => {
+          const queueId = port.portNo + 1;
+          const portQueue = this.queues.find((q) => q.id === queueId);
+          // 已锁定的分拣口不参与分配（AGV取货中或已锁定）
+          if (portQueue && portQueue.isLock === '1') {
+            return null;
+          }
+          const portQueueCount = portQueue ? portQueue.trayInfo.length : 0;
+          // 上货区中已分配该口目的地的包裹数量
+          const loadingQueueCount = this.queues[0].trayInfo.filter(
+            (item) => item.allocatedPortNo === port.portNo
+          ).length;
+          const currentLoad = portQueueCount + loadingQueueCount;
+          return { port, currentLoad };
+        })
+        .filter(Boolean);
+
+      // 优先级1：已有包裹但未满的分拣口（优先把没满的发完）
+      const partiallyFilled = portLoads.filter(
+        (p) => p.currentLoad > 0 && p.currentLoad < p.port.maxCapacity
+      );
+      if (partiallyFilled.length > 0) {
+        return partiallyFilled[0].port;
       }
+
+      // 优先级2：空闲的分拣口
+      const empty = portLoads.filter((p) => p.currentLoad === 0);
+      if (empty.length > 0) {
+        return empty[0].port;
+      }
+
       return null;
     },
     // 手动模拟 DBW16.bit0 上升沿信号（测试用）
@@ -3380,7 +3372,9 @@ export default {
               customerSource: tray.customerSource || tray.productName || '',
               destinationCountry: tray.destinationCountry || tray.unit || '',
               batchNo: tray.batchNo || '',
-              channel: tray.channel || ''
+              channel: tray.channel || '',
+              allocatedPortNo: tray.allocatedPortNo || '',
+              destinationCode: tray.destinationCode || ''
             };
           })
           .filter((tray) => tray.id);
@@ -5303,6 +5297,16 @@ export default {
                       line-height: 1.4;
                       flex: 1;
                       text-align: left;
+                    }
+                    .allocated-port {
+                      color: #409eff;
+                      font-weight: bold;
+                      flex: 0 0 auto;
+                    }
+                    .destination-code {
+                      color: #e6a23c;
+                      font-weight: bold;
+                      flex: 0 0 auto;
                     }
                   }
                   .tray-time {
