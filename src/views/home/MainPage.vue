@@ -213,10 +213,16 @@
                   @click="handleQueueMarkerClick(marker.queueId)"
                 >
                   <div class="queue-marker-content">
-                    <span class="queue-marker-count">{{
-                      queues.find((q) => q.id === marker.queueId)?.trayInfo
-                        ?.length || 0
-                    }}</span>
+                    <span class="queue-marker-count">
+                      <span class="queue-marker-count__queue">{{
+                        getQueueTrayCount(marker.queueId)
+                      }}</span>
+                      <span
+                        v-if="isSortPortQueue(marker.queueId)"
+                        class="queue-marker-count__plc"
+                        >/{{ getSortPortPlcCount(marker.queueId) }}</span
+                      >
+                    </span>
                     <span class="queue-marker-name">{{ marker.name }}</span>
                   </div>
                   <div
@@ -1040,7 +1046,7 @@
                     </div>
                   </div>
                 </div>
-                <!-- 工位虚拟ID与目的地信息汇总面板（01008~01020） -->
+                <!-- 输送线数据看板：虚拟ID与分拣口进货信息 -->
                 <div class="marker-with-panel" data-x="2900" data-y="350">
                   <div
                     class="data-panel"
@@ -1050,69 +1056,34 @@
                     <div class="data-panel-header">输送线数据看板</div>
                     <div class="data-panel-content" style="padding-top: 5px">
                       <div class="scan-groups-grid">
-                        <!-- 第一行：M1008 ~ M1014 -->
+                        <!-- 第一行：虚拟ID汇总 + 分拣口 1~3 -->
                         <div class="scan-group-row">
-                          <div
-                            class="scan-group with-watermark"
-                            v-for="num in [
-                              1008, 1009, 1010, 1011, 1012, 1013, 1014
-                            ]"
-                            :key="'belt-' + num"
-                          >
-                            <div class="group-watermark">M{{ num }}</div>
+                          <div class="scan-group with-watermark belt-ids-card">
+                            <div class="group-watermark">ID</div>
                             <div class="group-items">
                               <div class="scan-item">
-                                <span class="scan-label">虚拟ID</span>
+                                <span class="scan-label">1008</span>
                                 <span class="scan-value">{{
-                                  beltStationIds['M' + num] || '--'
+                                  beltStationIds['M1008'] || '--'
                                 }}</span>
                               </div>
                               <div class="scan-item">
-                                <span class="scan-label">目的地</span>
+                                <span class="scan-label">1009</span>
                                 <span class="scan-value">{{
-                                  beltStationDests['M' + num] || '--'
+                                  beltStationIds['M1009'] || '--'
                                 }}</span>
                               </div>
                             </div>
                           </div>
-                        </div>
-                        <!-- 第二行：M1015 ~ M1020 -->
-                        <div class="scan-group-row">
-                          <div
-                            class="scan-group with-watermark"
-                            v-for="num in [1015, 1016, 1017, 1018, 1019, 1020]"
-                            :key="'belt-' + num"
-                          >
-                            <div class="group-watermark">M{{ num }}</div>
-                            <div class="group-items">
-                              <div class="scan-item">
-                                <span class="scan-label">虚拟ID</span>
-                                <span class="scan-value">{{
-                                  beltStationIds['M' + num] || '--'
-                                }}</span>
-                              </div>
-                              <div class="scan-item">
-                                <span class="scan-label">目的地</span>
-                                <span class="scan-value">{{
-                                  beltStationDests['M' + num] || '--'
-                                }}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <!-- 分割线 -->
-                        <div class="panel-divider"></div>
-                        <!-- 分拣口卡片第一行：1~7 -->
-                        <div class="scan-group-row">
                           <div
                             class="scan-group with-watermark sort-port-card"
-                            v-for="port in [1, 2, 3, 4, 5, 6, 7]"
+                            v-for="port in [1, 2, 3]"
                             :key="'sort-port-' + port"
                           >
                             <div class="group-watermark">{{ port }}</div>
                             <div class="group-items">
                               <div class="scan-item">
-                                <span class="scan-label">进货ID</span>
+                                <span class="scan-label">ID</span>
                                 <span class="scan-value">{{
                                   sortPortPurchaseIds[port] || '--'
                                 }}</span>
@@ -1130,17 +1101,73 @@
                             </div>
                           </div>
                         </div>
-                        <!-- 分拣口卡片第二行：8~13 -->
+                        <!-- 第二行：分拣口 4~7 -->
                         <div class="scan-group-row">
                           <div
                             class="scan-group with-watermark sort-port-card"
-                            v-for="port in [8, 9, 10, 11, 12, 13]"
+                            v-for="port in [4, 5, 6, 7]"
                             :key="'sort-port-' + port"
                           >
                             <div class="group-watermark">{{ port }}</div>
                             <div class="group-items">
                               <div class="scan-item">
-                                <span class="scan-label">进货ID</span>
+                                <span class="scan-label">ID</span>
+                                <span class="scan-value">{{
+                                  sortPortPurchaseIds[port] || '--'
+                                }}</span>
+                              </div>
+                              <div class="scan-item">
+                                <span class="scan-label">呼叫AGV</span>
+                                <button
+                                  class="port-send-btn"
+                                  title="发送呼叫"
+                                  @click="callAgv(port)"
+                                >
+                                  <i class="el-icon-s-promotion"></i>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <!-- 第三行：分拣口 8~11 -->
+                        <div class="scan-group-row">
+                          <div
+                            class="scan-group with-watermark sort-port-card"
+                            v-for="port in [8, 9, 10, 11]"
+                            :key="'sort-port-' + port"
+                          >
+                            <div class="group-watermark">{{ port }}</div>
+                            <div class="group-items">
+                              <div class="scan-item">
+                                <span class="scan-label">ID</span>
+                                <span class="scan-value">{{
+                                  sortPortPurchaseIds[port] || '--'
+                                }}</span>
+                              </div>
+                              <div class="scan-item">
+                                <span class="scan-label">呼叫AGV</span>
+                                <button
+                                  class="port-send-btn"
+                                  title="发送呼叫"
+                                  @click="callAgv(port)"
+                                >
+                                  <i class="el-icon-s-promotion"></i>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <!-- 第四行：分拣口 12~13 -->
+                        <div class="scan-group-row">
+                          <div
+                            class="scan-group with-watermark sort-port-card"
+                            v-for="port in [12, 13]"
+                            :key="'sort-port-' + port"
+                          >
+                            <div class="group-watermark">{{ port }}</div>
+                            <div class="group-items">
+                              <div class="scan-item">
+                                <span class="scan-label">ID</span>
                                 <span class="scan-value">{{
                                   sortPortPurchaseIds[port] || '--'
                                 }}</span>
@@ -1378,49 +1405,151 @@
               </el-button>
             </div>
           </div>
-          <!-- DBW18 分拣口呼叫空托测试 -->
+          <!-- DBW1224~DBW1248 分拣口PLC计数测试 -->
           <div class="test-section">
-            <span class="test-label">DBW18 分拣口呼叫空托(AGV):</span>
-            <div class="qrcode-test-container qrcode-btn-grid">
-              <el-button size="small" @click="triggerEmptyTraySignal(1)">
-                口1
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(2)">
-                口2
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(3)">
-                口3
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(4)">
-                口4
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(5)">
-                口5
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(6)">
-                口6
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(7)">
-                口7
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(8)">
-                口8
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(9)">
-                口9
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(10)">
-                口10
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(11)">
-                口11
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(12)">
-                口12
-              </el-button>
-              <el-button size="small" @click="triggerEmptyTraySignal(13)">
-                口13
-              </el-button>
+            <span class="test-label">分拣口PLC计数(DBW1224~1248):</span>
+            <div class="qrcode-test-container qrcode-input-grid">
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口1:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[1]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口2:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[2]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口3:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[3]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口4:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[4]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口5:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[5]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口6:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[6]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口7:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[7]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口8:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[8]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口9:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[9]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口10:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[10]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口11:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[11]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口12:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[12]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">口13:</div>
+                <el-input
+                  v-model.number="sortPortPlcCounts[13]"
+                  size="small"
+                  placeholder="计数"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+            </div>
+          </div>
+          <!-- DBB748/DBB778 M1008/M1009虚拟ID测试 -->
+          <div class="test-section">
+            <span class="test-label">DBB748/DBB778 M1008/M1009虚拟ID:</span>
+            <div class="qrcode-test-container qrcode-input-grid">
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">M1008:</div>
+                <el-input
+                  v-model="beltStationIds.M1008"
+                  size="small"
+                  placeholder="虚拟ID（大包号）"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
+              <div class="qrcode-input-group">
+                <div class="qrcode-label">M1009:</div>
+                <el-input
+                  v-model="beltStationIds.M1009"
+                  size="small"
+                  placeholder="虚拟ID（大包号）"
+                  class="qrcode-input"
+                ></el-input>
+              </div>
             </div>
           </div>
           <!-- DBB298-717 分拣口进货ID测试 -->
@@ -1704,7 +1833,7 @@ export default {
       queues: [
         {
           id: 1,
-          queueName: '上货区',
+          queueName: '1008',
           trayInfo: []
         },
         {
@@ -1797,11 +1926,21 @@ export default {
           trayInfo: [],
           trayStatus: '',
           isLock: ''
+        },
+        {
+          id: 15,
+          queueName: '1009',
+          trayInfo: []
+        },
+        {
+          id: 16,
+          queueName: '剔除口',
+          trayInfo: []
         }
       ],
       // 添加队列位置标识数据
       queueMarkers: [
-        { id: 1, name: '上货区', queueId: 1, x: 650, y: 780 },
+        { id: 1, name: '1008', queueId: 1, x: 650, y: 780 },
         { id: 2, name: '分拣口1', queueId: 2, x: 1730, y: 1650 },
         { id: 3, name: '分拣口2', queueId: 3, x: 1730, y: 1020 },
         { id: 4, name: '分拣口3', queueId: 4, x: 1910, y: 1650 },
@@ -1814,7 +1953,9 @@ export default {
         { id: 11, name: '分拣口10', queueId: 11, x: 2470, y: 1020 },
         { id: 12, name: '分拣口11', queueId: 12, x: 2650, y: 1650 },
         { id: 13, name: '分拣口12', queueId: 13, x: 2650, y: 1020 },
-        { id: 14, name: '分拣口13', queueId: 14, x: 2820, y: 1350 }
+        { id: 14, name: '分拣口13', queueId: 14, x: 2820, y: 1350 },
+        { id: 15, name: '1009', queueId: 15, x: 1200, y: 1480 },
+        { id: 16, name: '剔除口', queueId: 16, x: 850, y: 1210 }
       ],
       // 输送线流动箭头配置（坐标按平面图调整）
       conveyorArrows: [
@@ -2001,21 +2142,6 @@ export default {
         bit14: '0',
         bit15: '0'
       },
-      // DBW18 分拣口呼叫空托
-      wcsDockWord18: {
-        bit0: '0',
-        bit1: '0',
-        bit2: '0',
-        bit3: '0',
-        bit4: '0',
-        bit5: '0',
-        bit6: '0',
-        bit7: '0',
-        bit8: '0',
-        bit9: '0',
-        bit10: '0',
-        bit11: '0'
-      },
       // 反馈WCS写虚拟ID
       sortPort01TrayId: '',
       sortPort02TrayId: '',
@@ -2033,34 +2159,23 @@ export default {
       // 各皮带工位虚拟ID（DB1000.DBB748-1137）01008~01020）
       beltStationIds: {
         M1008: '',
-        M1009: '',
-        M1010: '',
-        M1011: '',
-        M1012: '',
-        M1013: '',
-        M1014: '',
-        M1015: '',
-        M1016: '',
-        M1017: '',
-        M1018: '',
-        M1019: '',
-        M1020: ''
+        M1009: ''
       },
-      // 各皮带工位目的地（DB1001.DBW1200-1224）
-      beltStationDests: {
-        M1008: 0,
-        M1009: 0,
-        M1010: 0,
-        M1011: 0,
-        M1012: 0,
-        M1013: 0,
-        M1014: 0,
-        M1015: 0,
-        M1016: 0,
-        M1017: 0,
-        M1018: 0,
-        M1019: 0,
-        M1020: 0
+      // PLC分拣口计数（DBW1224~DBW1248，对应分拣口1~13）
+      sortPortPlcCounts: {
+        1: 0,
+        2: 0,
+        3: 0,
+        4: 0,
+        5: 0,
+        6: 0,
+        7: 0,
+        8: 0,
+        9: 0,
+        10: 0,
+        11: 0,
+        12: 0,
+        13: 0
       },
       // AGV/MCS轮询定时器
       mcsPollingTimer: null,
@@ -2193,58 +2308,17 @@ export default {
         this.handleSortPortEntrySuccess(13);
       }
     },
-    // DBW18 分拣口呼叫空托 上升沿检测（bit0~bit12 对应分拣口1~13）
-    'wcsDockWord18.bit0'(newVal, oldVal) {
+    // M1008虚拟ID变化监听：包裹到达M1008工位，设置isInQueue=1
+    'beltStationIds.M1008'(newVal, oldVal) {
       if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(1);
+      if (!newVal || !newVal.trim()) return;
+      this.handleM1008Change(newVal.trim());
     },
-    'wcsDockWord18.bit1'(newVal, oldVal) {
+    // M1009虚拟ID变化监听：包裹到达M1009工位，从1008队列移动到1009队列
+    'beltStationIds.M1009'(newVal, oldVal) {
       if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(2);
-    },
-    'wcsDockWord18.bit2'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(3);
-    },
-    'wcsDockWord18.bit3'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(4);
-    },
-    'wcsDockWord18.bit4'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(5);
-    },
-    'wcsDockWord18.bit5'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(6);
-    },
-    'wcsDockWord18.bit6'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(7);
-    },
-    'wcsDockWord18.bit7'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(8);
-    },
-    'wcsDockWord18.bit8'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(9);
-    },
-    'wcsDockWord18.bit9'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(10);
-    },
-    'wcsDockWord18.bit10'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(11);
-    },
-    'wcsDockWord18.bit11'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(12);
-    },
-    'wcsDockWord18.bit12'(newVal, oldVal) {
-      if (!this.isDataReady) return;
-      if (newVal === '1' && oldVal === '0') this.handleEmptyTraySignal(13);
+      if (!newVal || !newVal.trim()) return;
+      this.handleM1009Change(newVal.trim());
     }
   },
   mounted() {
@@ -2405,65 +2479,45 @@ export default {
       this.wcsDockWord16.bit14 = getBit(word16, 6);
       this.wcsDockWord16.bit15 = getBit(word16, 7);
 
-      // DBW18 分拣口呼叫空托
-      let word18 = this.convertToWord(values.DBW18 ?? 0);
-      this.wcsDockWord18.bit0 = getBit(word18, 8);
-      this.wcsDockWord18.bit1 = getBit(word18, 9);
-      this.wcsDockWord18.bit2 = getBit(word18, 10);
-      this.wcsDockWord18.bit3 = getBit(word18, 11);
-      this.wcsDockWord18.bit4 = getBit(word18, 12);
-      this.wcsDockWord18.bit5 = getBit(word18, 13);
-      this.wcsDockWord18.bit6 = getBit(word18, 14);
-      this.wcsDockWord18.bit7 = getBit(word18, 15);
-      this.wcsDockWord18.bit8 = getBit(word18, 0);
-      this.wcsDockWord18.bit9 = getBit(word18, 1);
-      this.wcsDockWord18.bit10 = getBit(word18, 2);
-      this.wcsDockWord18.bit11 = getBit(word18, 3);
+      // BAD值过滤：nodes7读取失败返回"BAD xxx"质量标记，跳过赋值保持原有效值
+      const safeSet = (obj, key, v) => {
+        if (typeof v !== 'string' || v.slice(0, 4) !== 'BAD ')
+          obj[key] = v ?? '';
+      };
 
       // 反馈WCS写虚拟ID
-      this.sortPort01TrayId = values.DBB298 ?? '';
-      this.sortPort02TrayId = values.DBB328 ?? '';
-      this.sortPort03TrayId = values.DBB358 ?? '';
-      this.sortPort04TrayId = values.DBB388 ?? '';
-      this.sortPort05TrayId = values.DBB418 ?? '';
-      this.sortPort06TrayId = values.DBB448 ?? '';
-      this.sortPort07TrayId = values.DBB478 ?? '';
-      this.sortPort08TrayId = values.DBB508 ?? '';
-      this.sortPort09TrayId = values.DBB538 ?? '';
-      this.sortPort10TrayId = values.DBB568 ?? '';
-      this.sortPort11TrayId = values.DBB598 ?? '';
-      this.sortPort12TrayId = values.DBB628 ?? '';
-      this.sortPort13TrayId = values.DBB658 ?? '';
+      safeSet(this, 'sortPort01TrayId', values.DBB298);
+      safeSet(this, 'sortPort02TrayId', values.DBB328);
+      safeSet(this, 'sortPort03TrayId', values.DBB358);
+      safeSet(this, 'sortPort04TrayId', values.DBB388);
+      safeSet(this, 'sortPort05TrayId', values.DBB418);
+      safeSet(this, 'sortPort06TrayId', values.DBB448);
+      safeSet(this, 'sortPort07TrayId', values.DBB478);
+      safeSet(this, 'sortPort08TrayId', values.DBB508);
+      safeSet(this, 'sortPort09TrayId', values.DBB538);
+      safeSet(this, 'sortPort10TrayId', values.DBB568);
+      safeSet(this, 'sortPort11TrayId', values.DBB598);
+      safeSet(this, 'sortPort12TrayId', values.DBB628);
+      safeSet(this, 'sortPort13TrayId', values.DBB658);
 
-      // 各皮带工位虚拟ID（DB1000.DBB748-1108）
-      this.beltStationIds.M1008 = values.DBB748 ?? '';
-      this.beltStationIds.M1009 = values.DBB778 ?? '';
-      this.beltStationIds.M1010 = values.DBB808 ?? '';
-      this.beltStationIds.M1011 = values.DBB838 ?? '';
-      this.beltStationIds.M1012 = values.DBB868 ?? '';
-      this.beltStationIds.M1013 = values.DBB898 ?? '';
-      this.beltStationIds.M1014 = values.DBB928 ?? '';
-      this.beltStationIds.M1015 = values.DBB958 ?? '';
-      this.beltStationIds.M1016 = values.DBB988 ?? '';
-      this.beltStationIds.M1017 = values.DBB1018 ?? '';
-      this.beltStationIds.M1018 = values.DBB1048 ?? '';
-      this.beltStationIds.M1019 = values.DBB1078 ?? '';
-      this.beltStationIds.M1020 = values.DBB1108 ?? '';
+      // 各皮带工位虚拟ID（DB1000.DBB748-778）
+      safeSet(this.beltStationIds, 'M1008', values.DBB748);
+      safeSet(this.beltStationIds, 'M1009', values.DBB778);
 
-      // 各皮带工位目的地（DB1000.DBW1198-1222）
-      this.beltStationDests.M1008 = values.DBW1198 ?? 0;
-      this.beltStationDests.M1009 = values.DBW1200 ?? 0;
-      this.beltStationDests.M1010 = values.DBW1202 ?? 0;
-      this.beltStationDests.M1011 = values.DBW1204 ?? 0;
-      this.beltStationDests.M1012 = values.DBW1206 ?? 0;
-      this.beltStationDests.M1013 = values.DBW1208 ?? 0;
-      this.beltStationDests.M1014 = values.DBW1210 ?? 0;
-      this.beltStationDests.M1015 = values.DBW1212 ?? 0;
-      this.beltStationDests.M1016 = values.DBW1214 ?? 0;
-      this.beltStationDests.M1017 = values.DBW1216 ?? 0;
-      this.beltStationDests.M1018 = values.DBW1218 ?? 0;
-      this.beltStationDests.M1019 = values.DBW1220 ?? 0;
-      this.beltStationDests.M1020 = values.DBW1222 ?? 0;
+      // 分拣口计数（DBW1224~DBW1248）
+      this.sortPortPlcCounts[1] = Number(values.DBW1224 ?? 0);
+      this.sortPortPlcCounts[2] = Number(values.DBW1226 ?? 0);
+      this.sortPortPlcCounts[3] = Number(values.DBW1228 ?? 0);
+      this.sortPortPlcCounts[4] = Number(values.DBW1230 ?? 0);
+      this.sortPortPlcCounts[5] = Number(values.DBW1232 ?? 0);
+      this.sortPortPlcCounts[6] = Number(values.DBW1234 ?? 0);
+      this.sortPortPlcCounts[7] = Number(values.DBW1236 ?? 0);
+      this.sortPortPlcCounts[8] = Number(values.DBW1238 ?? 0);
+      this.sortPortPlcCounts[9] = Number(values.DBW1240 ?? 0);
+      this.sortPortPlcCounts[10] = Number(values.DBW1242 ?? 0);
+      this.sortPortPlcCounts[11] = Number(values.DBW1244 ?? 0);
+      this.sortPortPlcCounts[12] = Number(values.DBW1246 ?? 0);
+      this.sortPortPlcCounts[13] = Number(values.DBW1248 ?? 0);
     });
     // 给PLC数据加载时间
     setTimeout(() => {
@@ -2472,6 +2526,19 @@ export default {
     }, 3000);
   },
   methods: {
+    // 获取队列托盘数量
+    getQueueTrayCount(queueId) {
+      const queue = this.queues.find((q) => q.id === queueId);
+      return queue?.trayInfo?.length || 0;
+    },
+    // 判断是否为分拣口队列（queueId 2~14 对应分拣口 1~13）
+    isSortPortQueue(queueId) {
+      return queueId >= 2 && queueId <= 14;
+    },
+    // 获取分拣口PLC计数
+    getSortPortPlcCount(queueId) {
+      return this.sortPortPlcCounts[queueId - 1] || 0;
+    },
     // 六面扫TCP直连（在渲染进程直接建立Socket，不通过background.js中转）
     connectSixScan() {
       this._sixScanDestroyed = false;
@@ -2607,7 +2674,8 @@ export default {
           batchNo: packageInfo.batchNo,
           destinationCountry: packageInfo.destinationCountry,
           channel: packageInfo.channel,
-          trayStatus: '1'
+          trayStatus: '1',
+          isInQueue: '0'
         };
 
         this.queues[0].trayInfo.push(queueItem);
@@ -2619,7 +2687,7 @@ export default {
         }
 
         this.addLog(
-          `六面扫上货成功，大包号：${packageInfo.packageNo}，已加入上货区队列（当前 ${this.queues[0].trayInfo.length} 件）`
+          `六面扫上货成功，大包号：${packageInfo.packageNo}，已加入1008队列（当前 ${this.queues[0].trayInfo.length} 件）`
         );
         this.$message.success(`大包 ${packageInfo.packageNo} 已上货`);
       } catch (error) {
@@ -2687,7 +2755,7 @@ export default {
         return;
       }
 
-      // 4. 单码重复检测：查上货区队列中是否已有同 packageNo 的条目
+      // 4. 单码重复检测：查1008队列中是否已有同 packageNo 的条目
       const existingIndex = this.queues[0].trayInfo.findIndex(
         (item) => item.packageNo === barcode
       );
@@ -2695,7 +2763,7 @@ export default {
         // 已入队，删除老条目，使其不再参与分拣口负载计算，后续当作新包裹重新分配
         const oldItem = this.queues[0].trayInfo.splice(existingIndex, 1)[0];
         this.addLog(
-          `目的地请求：条码重复，已移除队列中老信息（原分拣口：${oldItem.allocatedPortNo}）：${barcode}，将按新包裹重新分配`
+          `目的地请求：条码重复，已移除1008队列中老信息（原分拣口：${oldItem.allocatedPortNo}）：${barcode}，将按新包裹重新分配`
         );
         if (this.selectedQueueIndex === 0) {
           this.showTrays(0);
@@ -2722,14 +2790,20 @@ export default {
           );
         }
 
-        // 2. 计算该分拣口当前负载（队列中 + 上货区中已分配该口目的地的数量）
-        const queueId = port.portNo + 1; // 队列ID = portNo + 1（ID=1是上货区）
+        // 2. 计算该分拣口当前负载（分拣口队列中 + 1008队列中已分配该口的 + 1009队列中已分配该口的）
+        const queueId = port.portNo + 1; // 队列ID = portNo + 1（ID=1是1008，ID=2~14是分拣口）
         const portQueue = this.queues.find((q) => q.id === queueId);
         const portQueueCount = portQueue ? portQueue.trayInfo.length : 0;
-        const loadingQueueCount = this.queues[0].trayInfo.filter(
+        const q1008Count = this.queues[0].trayInfo.filter(
           (item) => item.allocatedPortNo === port.portNo
         ).length;
-        const currentLoad = portQueueCount + loadingQueueCount;
+        const q1009 = this.queues.find((q) => q.id === 15);
+        const q1009Count = q1009
+          ? q1009.trayInfo.filter(
+              (item) => item.allocatedPortNo === port.portNo
+            ).length
+          : 0;
+        const currentLoad = portQueueCount + q1008Count + q1009Count;
         const sequenceNo = currentLoad + 1;
 
         // 3. 判断是否最后一件
@@ -2759,7 +2833,7 @@ export default {
             port.sizeType === 'large' ? '大件' : '小件'
           }），分拣机${port.machineNo}，流水号${sequenceNo}，${
             isLast ? '最后一件' : '普通'
-          }，目的地编码：${destinationCode},已写入目的地编码：${destinationCode}，已写入虚拟ID（条码）：${barcode},分拣口当前包裹数量：${portQueueCount}，上货区包裹数量：${loadingQueueCount}`
+          }，目的地编码：${destinationCode},已写入目的地编码：${destinationCode}，已写入虚拟ID（条码）：${barcode},分拣口当前包裹数量：${portQueueCount}，1008队列包裹数量：${q1008Count}，1009队列包裹数量：${q1009Count}`
         );
 
         // 7. 保存订单到 order_info
@@ -2770,7 +2844,7 @@ export default {
           throw new Error((res && res.message) || '保存订单失败');
         }
 
-        // 8. 构建队列项，加入上货区队列（queues[0]）
+        // 8. 构建队列项，加入1008队列（queues[0]）
         const queueItem = {
           orderInfoId: savedOrder.id,
           packageNo: packageInfo.packageNo,
@@ -2782,7 +2856,8 @@ export default {
           channel: packageInfo.channel,
           trayStatus: '1',
           allocatedPortNo: port.portNo, // 记录分配的分拣口号，用于负载统计
-          destinationCode: destinationCode // 记录发送的目的地编码
+          destinationCode: destinationCode, // 记录发送的目的地编码
+          isInQueue: '0' // 包裹是否在队列中（M1008确认后置为1）
         };
         this.queues[0].trayInfo.push(queueItem);
 
@@ -2791,7 +2866,7 @@ export default {
         }
 
         this.addLog(
-          `目的地请求处理完成，大包号：${packageInfo.packageNo}，已加入上货区队列（当前 ${this.queues[0].trayInfo.length} 件），目标分拣口：${port.portNo}`
+          `目的地请求处理完成，大包号：${packageInfo.packageNo}，已加入1008队列（当前 ${this.queues[0].trayInfo.length} 件），目标分拣口：${port.portNo}`
         );
         this.$message.success(
           `大包 ${packageInfo.packageNo} 已分配至分拣口${port.portNo}`
@@ -2806,7 +2881,91 @@ export default {
         );
       }
     },
-    // 分拣口进货处理：虚拟ID变化 → 取进货ID → 从上货区移入对应分拣口队列
+    // M1008虚拟ID变化处理：包裹到达M1008工位，设置1008队列中对应包裹的isInQueue=1
+    handleM1008Change(virtualId) {
+      const q1008 = this.queues[0]; // 1008队列
+      const matchedItem = q1008.trayInfo.find(
+        (item) => (item.packageNo || '').trim() === virtualId
+      );
+      if (matchedItem) {
+        matchedItem.isInQueue = '1';
+        this.addLog(
+          `M1008确认包裹到达：大包号 ${virtualId}，已设置isInQueue=1`
+        );
+      } else {
+        this.addLog(
+          `M1008虚拟ID变化：大包号 ${virtualId}，但1008队列中未找到对应包裹`,
+          'alarm'
+        );
+      }
+      // 刷新当前选中队列显示
+      if (this.selectedQueueIndex === 0) {
+        this.showTrays(0);
+      }
+    },
+    // M1009虚拟ID变化处理：包裹到达M1009工位，从1008队列移动到1009队列
+    handleM1009Change(virtualId) {
+      const q1008 = this.queues[0]; // 1008队列
+      const q1009 = this.queues.find((q) => q.id === 15); // 1009队列
+      const rejectQueue = this.queues.find((q) => q.id === 16); // 剔除口队列
+      if (!q1009 || !rejectQueue) {
+        this.addLog('M1009处理失败：1009队列或剔除口队列不存在', 'alarm');
+        return;
+      }
+
+      // 在1008队列中查找本包裹位置
+      const currentIndex = q1008.trayInfo.findIndex(
+        (item) => (item.packageNo || '').trim() === virtualId
+      );
+      if (currentIndex === -1) {
+        this.addLog(
+          `M1009虚拟ID变化：大包号 ${virtualId}，但1008队列中未找到对应包裹`,
+          'alarm'
+        );
+        return;
+      }
+
+      const currentItem = q1008.trayInfo[currentIndex];
+
+      // 检查isInQueue状态
+      if (currentItem.isInQueue !== '1') {
+        this.addLog(
+          `M1009报警：大包号 ${virtualId} 的isInQueue不为1（未经过M1008确认），仍然移动到1009队列`,
+          'alarm'
+        );
+      }
+
+      // 将本包裹前面的包裹（未移动到1009的）移动到剔除口队列
+      if (currentIndex > 0) {
+        const precedingItems = q1008.trayInfo.splice(0, currentIndex);
+        precedingItems.forEach((item) => {
+          rejectQueue.trayInfo.push(item);
+        });
+        this.addLog(
+          `M1009处理：大包号 ${virtualId} 前面有 ${precedingItems.length} 个包裹未到达M1009，已移动到剔除口队列`
+        );
+      }
+
+      // 将本包裹从1008队列移除并加入1009队列
+      const [movedItem] = q1008.trayInfo.splice(0, 1);
+      q1009.trayInfo.push(movedItem);
+
+      this.addLog(
+        `M1009确认包裹通过：大包号 ${virtualId} 已从1008队列移动到1009队列（1009当前 ${q1009.trayInfo.length} 件）`
+      );
+
+      // 刷新当前选中队列显示
+      if (
+        this.selectedQueueIndex === 0 ||
+        this.selectedQueueIndex === this.queues.findIndex((q) => q.id === 15) ||
+        this.selectedQueueIndex === this.queues.findIndex((q) => q.id === 16)
+      ) {
+        this.$nextTick(() => {
+          this.showTrays(this.selectedQueueIndex);
+        });
+      }
+    },
+    // 分拣口进货处理：虚拟ID变化 → 取进货ID → 从1009队列移入对应分拣口队列
     handleSortPortEntrySuccess(portNo) {
       // 1. 根据分拣口号获取对应的进货ID（大包号，即六面扫条码号）
       const sortPortIdMap = {
@@ -2841,9 +3000,14 @@ export default {
 
       this.addLog(`分拣口${portNo}虚拟ID变化，进货ID（大包号）：${entryId}`);
 
-      // 2. 在上货区队列（queues[0]）中查找匹配的包裹（条码匹配 + 目的地匹配本分拣口）
-      const loadingQueue = this.queues[0];
-      const trayIndex = loadingQueue.trayInfo.findIndex(
+      // 2. 在1009队列（id=15）中查找匹配的包裹（条码匹配 + 目的地匹配本分拣口）
+      const q1009Index = this.queues.findIndex((q) => q.id === 15);
+      const q1009 = this.queues[q1009Index];
+      if (!q1009) {
+        this.addLog(`分拣口${portNo}进货处理失败：1009队列不存在`);
+        return;
+      }
+      const trayIndex = q1009.trayInfo.findIndex(
         (item) =>
           (item.packageNo || '').trim() === entryId &&
           item.allocatedPortNo === portNo
@@ -2851,21 +3015,21 @@ export default {
 
       if (trayIndex === -1) {
         this.addLog(
-          `分拣口${portNo}虚拟ID变化，但上货区未找到大包号 ${entryId} 且目的地为分拣口${portNo} 的包裹，跳过`
+          `分拣口${portNo}虚拟ID变化，但1009队列未找到大包号 ${entryId} 且目的地为分拣口${portNo} 的包裹，跳过`
         );
         return;
       }
 
-      // 3. 从上货区移除该包裹
-      const [movedTray] = loadingQueue.trayInfo.splice(trayIndex, 1);
+      // 3. 从1009队列移除该包裹
+      const [movedTray] = q1009.trayInfo.splice(trayIndex, 1);
 
       // 4. 加入对应分拣口队列（queues[portNo]）
       const targetQueueIndex = portNo; // queues[1]=分拣口1, queues[13]=分拣口13
       const targetQueue = this.queues[targetQueueIndex];
       if (!targetQueue) {
         this.addLog(`分拣口${portNo}对应队列不存在，包裹 ${entryId} 无法移入`);
-        // 回滚：将包裹放回上货区
-        loadingQueue.trayInfo.splice(trayIndex, 0, movedTray);
+        // 回滚：将包裹放回1009队列
+        q1009.trayInfo.splice(trayIndex, 0, movedTray);
         return;
       }
 
@@ -2873,7 +3037,7 @@ export default {
 
       // 6. 刷新当前选中的队列显示
       if (
-        this.selectedQueueIndex === 0 ||
+        this.selectedQueueIndex === q1009Index ||
         this.selectedQueueIndex === targetQueueIndex
       ) {
         this.$nextTick(() => {
@@ -2882,12 +3046,19 @@ export default {
       }
 
       this.addLog(
-        `大包 ${entryId} 已从上货区移入${targetQueue.queueName}（当前 ${targetQueue.trayInfo.length} 件）`
+        `大包 ${entryId} 已从1009队列移入${targetQueue.queueName}（当前 ${targetQueue.trayInfo.length} 件）`
       );
       this.$message.success(`大包 ${entryId} 已进入${targetQueue.queueName}`);
+
+      // 分拣口队列达到最大容量时，触发满容量判断（对比PLC计数与队列数量）
+      const portConfig = this.sortPortConfig.find((p) => p.portNo === portNo);
+      const maxCapacity = portConfig ? portConfig.maxCapacity : 5;
+      if (targetQueue.trayInfo.length >= maxCapacity) {
+        this.handleSortPortFull(portNo);
+      }
     },
     // ========== AGV/MCS 相关方法 ==========
-    // 手动呼叫AGV：弹出确认后执行空托信号流程
+    // 手动呼叫AGV：弹出确认后直接呼叫AGV取货（不做计数校验）
     callAgv(portNo) {
       this.$confirm('本操作会呼叫AGV取货，并锁定分拣口，是否继续？', '警告', {
         confirmButtonText: '确定',
@@ -2895,32 +3066,72 @@ export default {
         type: 'warning'
       })
         .then(() => {
-          this.handleEmptyTraySignal(portNo, true);
+          this.doCallAgv(portNo);
         })
         .catch(() => {
           this.$message.info('已取消呼叫AGV');
         });
     },
-    // DBW18空托信号上升沿触发：锁定分拣口 + 发PLC禁止进货 + 调MCS通知AGV取货
-    // isManual=true 表示手动呼叫，日志不输出"空托信号"相关字眼
-    async handleEmptyTraySignal(portNo, isManual = false) {
+    // 分拣口队列达到最大容量后，对比PLC计数与队列数量，决定呼叫AGV或锁定报警
+    async handleSortPortFull(portNo) {
       const queueIndex = portNo; // queues[1]=分拣口1, ..., queues[13]=分拣口13
       const queue = this.queues[queueIndex];
-      const srcLabel = isManual ? '手动呼叫' : '空托信号';
       if (!queue) {
-        this.addLog(`分拣口${portNo}${srcLabel}无效，队列不存在`);
+        this.addLog(`分拣口${portNo}满容量判断失败，队列不存在`);
         return;
       }
       // 已锁定的分拣口不重复处理
       if (queue.isLock === '1') {
-        this.addLog(`分拣口${portNo}已锁定，忽略重复${srcLabel}`);
+        this.addLog(`分拣口${portNo}已锁定，忽略满容量重复触发`);
         return;
       }
+
+      const portConfig = this.sortPortConfig.find((p) => p.portNo === portNo);
+      const maxCapacity = portConfig ? portConfig.maxCapacity : 5;
+      const queueCount = queue.trayInfo.length;
+      const plcCount = this.sortPortPlcCounts[portNo] || 0;
+
       this.addLog(
-        `分拣口${portNo}${
-          isManual ? '手动' : '收到空托信号'
-        }呼叫AGV，开始通知取货`
+        `分拣口${portNo}队列已满（${queueCount}/${maxCapacity}），PLC计数：${plcCount}，队列数量：${queueCount}`
       );
+
+      // 对比PLC分拣口计数与分拣口队列数量
+      if (plcCount !== queueCount) {
+        // 数量不匹配：发送锁定信号 + 报警，不呼叫AGV
+        this.addLog(
+          `分拣口${portNo}数量不匹配！PLC计数=${plcCount}，队列数量=${queueCount}，发送锁定信号，暂停呼叫AGV`,
+          'alarm'
+        );
+        // 锁定队列
+        this.syncAgvStatusToBackend(queue.id, null, '1');
+        // 发送PLC禁止进货命令
+        const forbidBitAdd = `W_DBW102_BIT${queueIndex - 1}`;
+        ipcRenderer.send('writeSingleValueToPLC', forbidBitAdd, true);
+        this.addLog(
+          `已发送PLC禁止进货命令 ${forbidBitAdd}=true（分拣口${portNo}，数量不匹配锁定）`
+        );
+        setTimeout(() => {
+          ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
+        }, 2000);
+        return;
+      }
+
+      // 数量匹配：呼叫AGV取货
+      this.addLog(`分拣口${portNo}数量匹配，开始呼叫AGV取货`);
+      await this.doCallAgv(portNo);
+    },
+    // 核心AGV呼叫逻辑：调MCS通知AGV取货 + 锁定队列 + 发PLC禁止进货
+    async doCallAgv(portNo) {
+      const queueIndex = portNo;
+      const queue = this.queues[queueIndex];
+      if (!queue) {
+        this.addLog(`分拣口${portNo}呼叫AGV失败，队列不存在`);
+        return;
+      }
+      if (queue.isLock === '1') {
+        this.addLog(`分拣口${portNo}已锁定，忽略重复呼叫AGV`);
+        return;
+      }
 
       // 1. 调用MCS接口通知AGV取货（必须成功才继续后续操作）
       try {
@@ -2941,7 +3152,7 @@ export default {
           signalId: String(Date.now()),
           // 触发源类型固定：2-工位
           signalSourceType: 2,
-          // 信号值（任务类型），固定2
+          // 信号值（任务类型），固定4
           signalTriggerValue: 4,
           // 触发源（下料点点位编号，GW01~GW13的分拣口编号）
           signalSourceValues: [`GW${String(portNo).padStart(2, '0')}`],
@@ -3014,7 +3225,7 @@ export default {
           res.data.forEach((queueData) => {
             const queueId = queueData.id;
             const queueIndex = queueId - 1;
-            if (queueIndex < 1 || queueIndex >= this.queues.length) return; // 跳过上货区(id=1)
+            if (queueIndex < 1 || queueIndex >= this.queues.length) return; // 跳过1008队列(id=1)
             const queue = this.queues[queueIndex];
             const dbTrayStatus = queueData.trayStatus || '';
             const dbIsLock = queueData.isLock || '';
@@ -3069,6 +3280,7 @@ export default {
       candidates.sort((a, b) => a.portNo - b.portNo);
 
       // 计算每个分拣口的当前负载
+      const q1009 = this.queues.find((q) => q.id === 15);
       const portLoads = candidates
         .map((port) => {
           const queueId = port.portNo + 1;
@@ -3078,11 +3290,17 @@ export default {
             return null;
           }
           const portQueueCount = portQueue ? portQueue.trayInfo.length : 0;
-          // 上货区中已分配该口目的地的包裹数量
-          const loadingQueueCount = this.queues[0].trayInfo.filter(
+          // 1008队列中已分配该口目的地的包裹数量
+          const q1008Count = this.queues[0].trayInfo.filter(
             (item) => item.allocatedPortNo === port.portNo
           ).length;
-          const currentLoad = portQueueCount + loadingQueueCount;
+          // 1009队列中已分配该口目的地的包裹数量
+          const q1009Count = q1009
+            ? q1009.trayInfo.filter(
+                (item) => item.allocatedPortNo === port.portNo
+              ).length
+            : 0;
+          const currentLoad = portQueueCount + q1008Count + q1009Count;
           return { port, currentLoad };
         })
         .filter(Boolean);
@@ -3110,18 +3328,6 @@ export default {
       setTimeout(() => {
         this.wcsDockWord16.bit0 = '0';
         this.addLog('DBW16.bit0 已恢复为 0');
-      }, 1000);
-    },
-    // 手动模拟 DBW18 分拣口呼叫空托信号（测试用）
-    triggerEmptyTraySignal(portNo) {
-      const bitKey = `bit${portNo - 1}`;
-      this.wcsDockWord18[bitKey] = '1';
-      this.addLog(
-        `手动触发 DBW18.${bitKey} = 1（分拣口${portNo}呼叫空托/AGV，1秒后恢复）`
-      );
-      setTimeout(() => {
-        this.wcsDockWord18[bitKey] = '0';
-        this.addLog(`DBW18.${bitKey} 已恢复为 0`);
       }, 1000);
     },
     // 构建目的地编码
@@ -4643,16 +4849,20 @@ export default {
 
                     .scan-group-row {
                       display: grid;
-                      grid-template-columns: repeat(7, 1fr);
-                      gap: 6px;
+                      grid-template-columns: repeat(4, 1fr);
+                      gap: 8px;
                     }
 
                     .scan-group {
+                      display: flex;
+                      flex-direction: column;
+                      justify-content: center;
+                      min-height: 54px;
                       background: rgba(64, 158, 255, 0.08);
                       border: 1px solid rgba(64, 158, 255, 0.2);
                       border-left: 3px solid #409eff;
                       border-radius: 6px;
-                      padding: 6px 8px;
+                      padding: 5px 10px;
                     }
 
                     .scan-group.with-watermark {
@@ -4660,13 +4870,24 @@ export default {
                       overflow: hidden;
                     }
 
+                    .belt-ids-card {
+                      background: rgba(10, 197, 168, 0.1);
+                      border-color: rgba(10, 197, 168, 0.25);
+                      border-left-color: #0ac5a8;
+
+                      .group-watermark {
+                        color: rgba(10, 197, 168, 0.55);
+                      }
+                    }
+
                     .sort-port-card {
-                      background: rgba(120, 150, 200, 0.08);
-                      border-color: rgba(120, 150, 200, 0.2);
+                      background: rgba(120, 150, 200, 0.1);
+                      border-color: rgba(120, 150, 200, 0.25);
                       border-left-color: #7896c8;
 
                       .group-watermark {
-                        color: rgba(120, 150, 200, 0.35);
+                        color: rgba(170, 195, 235, 0.65);
+                        text-shadow: 0 0 5px rgba(0, 0, 0, 0.55);
                       }
 
                       .port-send-btn {
@@ -4687,9 +4908,10 @@ export default {
                       top: 50%;
                       left: 50%;
                       transform: translate(-50%, -50%);
-                      font-size: 22px;
+                      font-size: 24px;
                       font-weight: 900;
-                      color: rgba(64, 158, 255, 0.4);
+                      color: rgba(100, 185, 255, 0.65);
+                      text-shadow: 0 0 5px rgba(0, 0, 0, 0.55);
                       pointer-events: none;
                       user-select: none;
                       z-index: 0;
@@ -4699,7 +4921,7 @@ export default {
                     .group-items {
                       display: flex;
                       flex-direction: column;
-                      gap: 2px;
+                      gap: 3px;
                       position: relative;
                       z-index: 1;
                     }
@@ -4713,7 +4935,7 @@ export default {
 
                     .scan-label {
                       font-size: 11px;
-                      color: rgba(255, 255, 255, 0.7);
+                      color: rgba(255, 255, 255, 0.75);
                     }
 
                     .scan-value {
@@ -4971,9 +5193,15 @@ export default {
                   }
 
                   .queue-marker-count {
+                    display: inline-flex;
+                    align-items: baseline;
                     font-size: 14px;
                     font-weight: bold;
                     color: #409eff;
+
+                    .queue-marker-count__plc {
+                      color: #e6a23c;
+                    }
                   }
                 }
               }

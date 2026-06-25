@@ -490,7 +490,6 @@ function conPLC() {
           conn.addItems('DBW12'); // 光电信号--1
           conn.addItems('DBW14'); // 光电信号--2
           conn.addItems('DBW16'); // 对接WCS信号
-          conn.addItems('DBW18'); // 对接WCS信号
           // 反馈WCS写虚拟ID（DB1000.DBB298-717，每段 char(30)）
           conn.addItems('DBB298'); // 分拣口01进货ID
           conn.addItems('DBB328'); // 分拣口02进货ID
@@ -506,37 +505,26 @@ function conPLC() {
           conn.addItems('DBB628'); // 分拣口12进货ID
           conn.addItems('DBB658'); // 分拣口13进货ID
           conn.addItems('DBB688'); // 备用
-          // 各皮带工位虚拟ID（DB1000.DBB748-1137）
+          // 各皮带工位虚拟ID（DB1000.DBB748-778）
           conn.addItems('DBB748'); // M1008工位ID
           conn.addItems('DBB778'); // M1009工位ID
-          conn.addItems('DBB808'); // M1010工位ID
-          conn.addItems('DBB838'); // M1011工位ID
-          conn.addItems('DBB868'); // M1012工位ID
-          conn.addItems('DBB898'); // M1013工位ID
-          conn.addItems('DBB928'); // M1014工位ID
-          conn.addItems('DBB958'); // M1015工位ID
-          conn.addItems('DBB988'); // M1016工位ID
-          conn.addItems('DBB1018'); // M1017工位ID
-          conn.addItems('DBB1048'); // M1018工位ID
-          conn.addItems('DBB1078'); // M1019工位ID
-          conn.addItems('DBB1108'); // M1020工位ID
-          // 各皮带工位目的地（DB1000.DBW1198-1222）
-          conn.addItems('DBW1198'); // M1008目的地
-          conn.addItems('DBW1200'); // M1009目的地
-          conn.addItems('DBW1202'); // M1010目的地
-          conn.addItems('DBW1204'); // M1011目的地
-          conn.addItems('DBW1206'); // M1012目的地
-          conn.addItems('DBW1208'); // M1013目的地
-          conn.addItems('DBW1210'); // M1014目的地
-          conn.addItems('DBW1212'); // M1015目的地
-          conn.addItems('DBW1214'); // M1016目的地
-          conn.addItems('DBW1216'); // M1017目的地
-          conn.addItems('DBW1218'); // M1018目的地
-          conn.addItems('DBW1220'); // M1019目的地
-          conn.addItems('DBW1222'); // M1020目的地
+          // 分拣口计数（DB1000.DBW1224-1248，每段INT）
+          conn.addItems('DBW1224'); // 分拣口1计数
+          conn.addItems('DBW1226'); // 分拣口2计数
+          conn.addItems('DBW1228'); // 分拣口3计数
+          conn.addItems('DBW1230'); // 分拣口4计数
+          conn.addItems('DBW1232'); // 分拣口5计数
+          conn.addItems('DBW1234'); // 分拣口6计数
+          conn.addItems('DBW1236'); // 分拣口7计数
+          conn.addItems('DBW1238'); // 分拣口8计数
+          conn.addItems('DBW1240'); // 分拣口9计数
+          conn.addItems('DBW1242'); // 分拣口10计数
+          conn.addItems('DBW1244'); // 分拣口11计数
+          conn.addItems('DBW1246'); // 分拣口12计数
+          conn.addItems('DBW1248'); // 分拣口13计数
           setInterval(() => {
             conn.readAllItems(valuesReady);
-          }, 200);
+          }, 300);
           setInterval(() => {
             // nodes7 代码
             conn.writeItems(writeAddArr, writeStrArr, valuesWritten);
@@ -574,7 +562,6 @@ var variables = {
   DBW12: 'DB1000,INT12', // 光电信号--1
   DBW14: 'DB1000,INT14', // 光电信号--2
   DBW16: 'DB1000,INT16', // 对接WCS信号
-  DBW18: 'DB1000,INT18', // 对接WCS信号
   DBB298: 'DB1000,S298.28', // 分拣口01进货ID
   DBB328: 'DB1000,S328.28', // 分拣口02进货ID
   DBB358: 'DB1000,S358.28', // 分拣口03进货ID
@@ -589,34 +576,23 @@ var variables = {
   DBB628: 'DB1000,S628.28', // 分拣口12进货ID
   DBB658: 'DB1000,S658.28', // 分拣口13进货ID
   DBB688: 'DB1000,S688.28', // 备用
-  // —— 各皮带工位虚拟ID（DB1000.DBB748-1137，每段 char(30)）——
+  // —— 各皮带工位虚拟ID（DB1000.DBB748-778，每段 char(30)）——
   DBB748: 'DB1000,S748.28', // M1008工位ID
   DBB778: 'DB1000,S778.28', // M1009工位ID
-  DBB808: 'DB1000,S808.28', // M1010工位ID
-  DBB838: 'DB1000,S838.28', // M1011工位ID
-  DBB868: 'DB1000,S868.28', // M1012工位ID
-  DBB898: 'DB1000,S898.28', // M1013工位ID
-  DBB928: 'DB1000,S928.28', // M1014工位ID
-  DBB958: 'DB1000,S958.28', // M1015工位ID
-  DBB988: 'DB1000,S988.28', // M1016工位ID
-  DBB1018: 'DB1000,S1018.28', // M1017工位ID
-  DBB1048: 'DB1000,S1048.28', // M1018工位ID
-  DBB1078: 'DB1000,S1078.28', // M1019工位ID
-  DBB1108: 'DB1000,S1108.28', // M1020工位ID
-  // —— 各皮带工位目的地（DB1000.DBW1198-1222，INT）——
-  DBW1198: 'DB1000,INT1198', // M1008目的地
-  DBW1200: 'DB1000,INT1200', // M1009目的地
-  DBW1202: 'DB1000,INT1202', // M1010目的地
-  DBW1204: 'DB1000,INT1204', // M1011目的地
-  DBW1206: 'DB1000,INT1206', // M1012目的地
-  DBW1208: 'DB1000,INT1208', // M1013目的地
-  DBW1210: 'DB1000,INT1210', // M1014目的地
-  DBW1212: 'DB1000,INT1212', // M1015目的地
-  DBW1214: 'DB1000,INT1214', // M1016目的地
-  DBW1216: 'DB1000,INT1216', // M1017目的地
-  DBW1218: 'DB1000,INT1218', // M1018目的地
-  DBW1220: 'DB1000,INT1220', // M1019目的地
-  DBW1222: 'DB1000,INT1222', // M1020目的地
+  // —— 分拣口计数（DB1000.DBW1224-1248，每段INT）——
+  DBW1224: 'DB1000,INT1224', // 分拣口1计数
+  DBW1226: 'DB1000,INT1226', // 分拣口2计数
+  DBW1228: 'DB1000,INT1228', // 分拣口3计数
+  DBW1230: 'DB1000,INT1230', // 分拣口4计数
+  DBW1232: 'DB1000,INT1232', // 分拣口5计数
+  DBW1234: 'DB1000,INT1234', // 分拣口6计数
+  DBW1236: 'DB1000,INT1236', // 分拣口7计数
+  DBW1238: 'DB1000,INT1238', // 分拣口8计数
+  DBW1240: 'DB1000,INT1240', // 分拣口9计数
+  DBW1242: 'DB1000,INT1242', // 分拣口10计数
+  DBW1244: 'DB1000,INT1244', // 分拣口11计数
+  DBW1246: 'DB1000,INT1246', // 分拣口12计数
+  DBW1248: 'DB1000,INT1248', // 分拣口13计数
   // —— 写入（写入点位.csv / DB1001）——
   W_DBW0: 'DB1001,INT0', // WCS看门狗心跳
   W_DBW2: 'DB1001,INT2', // WCS-全线启动（系统在线）
