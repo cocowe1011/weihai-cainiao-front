@@ -4857,12 +4857,12 @@ export default {
                       display: flex;
                       flex-direction: column;
                       justify-content: center;
-                      min-height: 54px;
+                      min-height: 50px;
                       background: rgba(64, 158, 255, 0.08);
                       border: 1px solid rgba(64, 158, 255, 0.2);
                       border-left: 3px solid #409eff;
                       border-radius: 6px;
-                      padding: 5px 10px;
+                      padding: 3px 10px;
                     }
 
                     .scan-group.with-watermark {
@@ -4944,10 +4944,7 @@ export default {
                       font-weight: 500;
                       text-align: right;
                       flex: 1;
-                      overflow: hidden;
-                      text-overflow: ellipsis;
-                      white-space: nowrap;
-                      max-width: 80px;
+                      word-break: break-all;
                     }
 
                     .panel-divider {
