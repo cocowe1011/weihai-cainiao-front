@@ -30,6 +30,7 @@ const fs = require('fs');
 var appTray = null;
 let closeStatus = false;
 var conn = new nodes7();
+var connFast = new nodes7(); // 快速扫描连接 - 仅读取DBW16，100ms周期
 
 // 读取缩放配置文件（D://weihai-cainiao-front/config/zoom.json，升级不覆盖）
 function readZoomConfig() {
@@ -294,6 +295,7 @@ app.on('ready', () => {
   ipcMain.on('conPLC', (event, arg1, arg2) => {
     if (process.env.NODE_ENV === 'production') {
       conPLC();
+      conPLCFast();
     }
     // setInterval(() => {
     //   console.log(writeStrArr.toString());
@@ -505,9 +507,9 @@ function conPLC() {
           conn.addItems('DBB628'); // 分拣口12进货ID
           conn.addItems('DBB658'); // 分拣口13进货ID
           conn.addItems('DBB688'); // 备用
-          // 各皮带工位虚拟ID（DB1000.DBB748-778）
+          // 各皮带工位虚拟ID（DB1000.DBB748-808）
           conn.addItems('DBB748'); // M1008工位ID
-          conn.addItems('DBB778'); // M1009工位ID
+          conn.addItems('DBB808'); // M1010工位ID
           // 分拣口计数（DB1000.DBW1224-1248，每段INT）
           conn.addItems('DBW1224'); // 分拣口1计数
           conn.addItems('DBW1226'); // 分拣口2计数
@@ -538,6 +540,56 @@ function conPLC() {
       logger.info('config error!');
     });
 }
+
+// 快速扫描连接 - 仅读取DBW16（对接WCS信号），100ms周期
+// 目的：目的地请求(bit0)脉冲可能很短，300ms扫描会漏读
+function conPLCFast() {
+  logger.info('开始连接PLC（快速扫描DBW16）');
+  HttpUtil.get('/cssConfig/getConfig')
+    .then((res) => {
+      if (!res.data.plcPort) {
+        logger.info('快速扫描配置查询失败，3秒后重试');
+        setTimeout(() => conPLCFast(), 3000);
+        return false;
+      }
+      connFast.initiateConnection(
+        {
+          port: Number(res.data.plcPort),
+          host: res.data.plcIp,
+          rack: 0,
+          slot: 1,
+          debug: false
+        },
+        (err) => {
+          if (typeof err !== 'undefined') {
+            logger.info('快速扫描连接PLC失败' + JSON.stringify(err));
+            setTimeout(() => conPLCFast(), 3000);
+            return false;
+          }
+          connFast.setTranslationCB(function (tag) {
+            return variables[tag];
+          });
+          logger.info('快速扫描连接PLC成功');
+          connFast.addItems('DBW16');
+          setInterval(() => {
+            connFast.readAllItems(valuesReadyFast);
+          }, 100);
+        }
+      );
+    })
+    .catch((err) => {
+      logger.info('快速扫描config error!');
+      setTimeout(() => conPLCFast(), 3000);
+    });
+}
+
+function valuesReadyFast(anythingBad, values) {
+  if (anythingBad) {
+    console.log('快速扫描读取异常');
+  }
+  mainWindow.webContents.send('receivedFastMsg', values);
+}
+
 let times = 1;
 let nowValue = 0;
 function sendHeartToPLC() {
@@ -576,9 +628,9 @@ var variables = {
   DBB628: 'DB1000,S628.28', // 分拣口12进货ID
   DBB658: 'DB1000,S658.28', // 分拣口13进货ID
   DBB688: 'DB1000,S688.28', // 备用
-  // —— 各皮带工位虚拟ID（DB1000.DBB748-778，每段 char(30)）——
+  // —— 各皮带工位虚拟ID（DB1000.DBB748-808，每段 char(30)）——
   DBB748: 'DB1000,S748.28', // M1008工位ID
-  DBB778: 'DB1000,S778.28', // M1009工位ID
+  DBB808: 'DB1000,S808.28', // M1010工位ID
   // —— 分拣口计数（DB1000.DBW1224-1248，每段INT）——
   DBW1224: 'DB1000,INT1224', // 分拣口1计数
   DBW1226: 'DB1000,INT1226', // 分拣口2计数

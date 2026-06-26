@@ -1068,9 +1068,9 @@
                                 }}</span>
                               </div>
                               <div class="scan-item">
-                                <span class="scan-label">1009</span>
+                                <span class="scan-label">1010</span>
                                 <span class="scan-value">{{
-                                  beltStationIds['M1009'] || '--'
+                                  beltStationIds['M1010'] || '--'
                                 }}</span>
                               </div>
                             </div>
@@ -1528,9 +1528,9 @@
               </div>
             </div>
           </div>
-          <!-- DBB748/DBB778 M1008/M1009虚拟ID测试 -->
+          <!-- DBB748/DBB808 M1008/M1010虚拟ID测试 -->
           <div class="test-section">
-            <span class="test-label">DBB748/DBB778 M1008/M1009虚拟ID:</span>
+            <span class="test-label">DBB748/DBB808 M1008/M1010虚拟ID:</span>
             <div class="qrcode-test-container qrcode-input-grid">
               <div class="qrcode-input-group">
                 <div class="qrcode-label">M1008:</div>
@@ -1542,9 +1542,9 @@
                 ></el-input>
               </div>
               <div class="qrcode-input-group">
-                <div class="qrcode-label">M1009:</div>
+                <div class="qrcode-label">M1010:</div>
                 <el-input
-                  v-model="beltStationIds.M1009"
+                  v-model="beltStationIds.M1010"
                   size="small"
                   placeholder="虚拟ID（大包号）"
                   class="qrcode-input"
@@ -1929,7 +1929,7 @@ export default {
         },
         {
           id: 15,
-          queueName: '1009',
+          queueName: '1010',
           trayInfo: []
         },
         {
@@ -1954,7 +1954,7 @@ export default {
         { id: 12, name: '分拣口11', queueId: 12, x: 2650, y: 1650 },
         { id: 13, name: '分拣口12', queueId: 13, x: 2650, y: 1020 },
         { id: 14, name: '分拣口13', queueId: 14, x: 2820, y: 1350 },
-        { id: 15, name: '1009', queueId: 15, x: 1200, y: 1480 },
+        { id: 15, name: '1010', queueId: 15, x: 1200, y: 1480 },
         { id: 16, name: '剔除口', queueId: 16, x: 850, y: 1210 }
       ],
       // 输送线流动箭头配置（坐标按平面图调整）
@@ -2159,7 +2159,7 @@ export default {
       // 各皮带工位虚拟ID（DB1000.DBB748-1137）01008~01020）
       beltStationIds: {
         M1008: '',
-        M1009: ''
+        M1010: ''
       },
       // PLC分拣口计数（DBW1224~DBW1248，对应分拣口1~13）
       sortPortPlcCounts: {
@@ -2314,11 +2314,11 @@ export default {
       if (!newVal || !newVal.trim()) return;
       this.handleM1008Change(newVal.trim());
     },
-    // M1009虚拟ID变化监听：包裹到达M1009工位，从1008队列移动到1009队列
-    'beltStationIds.M1009'(newVal, oldVal) {
+    // M1010虚拟ID变化监听：包裹到达M1010工位，从1008队列移动到1010队列
+    'beltStationIds.M1010'(newVal, oldVal) {
       if (!this.isDataReady) return;
       if (!newVal || !newVal.trim()) return;
-      this.handleM1009Change(newVal.trim());
+      this.handleM1010Change(newVal.trim());
     }
   },
   mounted() {
@@ -2461,8 +2461,8 @@ export default {
       this.photoelectricSignal2.bit15 = getBit(word14, 7);
 
       // DBW16 对接WCS信号
+      // bit0(目的地请求)已改由快速扫描(100ms)单独更新，见下方 receivedFastMsg
       let word16 = this.convertToWord(values.DBW16 ?? 0);
-      this.wcsDockWord16.bit0 = getBit(word16, 8);
       this.wcsDockWord16.bit1 = getBit(word16, 9);
       this.wcsDockWord16.bit2 = getBit(word16, 10);
       this.wcsDockWord16.bit3 = getBit(word16, 11);
@@ -2500,9 +2500,9 @@ export default {
       safeSet(this, 'sortPort12TrayId', values.DBB628);
       safeSet(this, 'sortPort13TrayId', values.DBB658);
 
-      // 各皮带工位虚拟ID（DB1000.DBB748-778）
+      // 各皮带工位虚拟ID（DB1000.DBB748-808）
       safeSet(this.beltStationIds, 'M1008', values.DBB748);
-      safeSet(this.beltStationIds, 'M1009', values.DBB778);
+      safeSet(this.beltStationIds, 'M1010', values.DBB808);
 
       // 分拣口计数（DBW1224~DBW1248）
       this.sortPortPlcCounts[1] = Number(values.DBW1224 ?? 0);
@@ -2518,6 +2518,13 @@ export default {
       this.sortPortPlcCounts[11] = Number(values.DBW1244 ?? 0);
       this.sortPortPlcCounts[12] = Number(values.DBW1246 ?? 0);
       this.sortPortPlcCounts[13] = Number(values.DBW1248 ?? 0);
+    });
+    // 快速扫描DBW16（100ms周期）- 仅更新bit0（目的地请求）
+    // PLC脉冲可能短于300ms，单独用第二个连接100ms扫描确保不漏读
+    ipcRenderer.on('receivedFastMsg', (event, values) => {
+      const getBit = (word, bitIndex) => ((word >> bitIndex) & 1).toString();
+      let word16 = this.convertToWord(values.DBW16 ?? 0);
+      this.wcsDockWord16.bit0 = getBit(word16, 8);
     });
     // 给PLC数据加载时间
     setTimeout(() => {
@@ -2793,20 +2800,20 @@ export default {
           );
         }
 
-        // 2. 计算该分拣口当前负载（分拣口队列中 + 1008队列中已分配该口的 + 1009队列中已分配该口的）
+        // 2. 计算该分拣口当前负载（分拣口队列中 + 1008队列中已分配该口的 + 1010队列中已分配该口的）
         const queueId = port.portNo + 1; // 队列ID = portNo + 1（ID=1是1008，ID=2~14是分拣口）
         const portQueue = this.queues.find((q) => q.id === queueId);
         const portQueueCount = portQueue ? portQueue.trayInfo.length : 0;
         const q1008Count = this.queues[0].trayInfo.filter(
           (item) => item.allocatedPortNo === port.portNo
         ).length;
-        const q1009 = this.queues.find((q) => q.id === 15);
-        const q1009Count = q1009
-          ? q1009.trayInfo.filter(
+        const q1010 = this.queues.find((q) => q.id === 15);
+        const q1010Count = q1010
+          ? q1010.trayInfo.filter(
               (item) => item.allocatedPortNo === port.portNo
             ).length
           : 0;
-        const currentLoad = portQueueCount + q1008Count + q1009Count;
+        const currentLoad = portQueueCount + q1008Count + q1010Count;
         const sequenceNo = currentLoad + 1;
 
         // 3. 判断是否最后一件
@@ -2836,7 +2843,7 @@ export default {
             port.sizeType === 'large' ? '大件' : '小件'
           }），分拣机${port.machineNo}，流水号${sequenceNo}，${
             isLast ? '最后一件' : '普通'
-          }，目的地编码：${destinationCode},已写入目的地编码：${destinationCode}，已写入虚拟ID（条码）：${barcode},分拣口当前包裹数量：${portQueueCount}，1008队列包裹数量：${q1008Count}，1009队列包裹数量：${q1009Count}`
+          }，目的地编码：${destinationCode},已写入目的地编码：${destinationCode}，已写入虚拟ID（条码）：${barcode},分拣口当前包裹数量：${portQueueCount}，1008队列包裹数量：${q1008Count}，1010队列包裹数量：${q1010Count}`
         );
 
         // 7. 保存订单到 order_info
@@ -2906,13 +2913,13 @@ export default {
         this.showTrays(0);
       }
     },
-    // M1009虚拟ID变化处理：包裹到达M1009工位，从1008队列移动到1009队列
-    handleM1009Change(virtualId) {
+    // M1010虚拟ID变化处理：包裹到达M1010工位，从1008队列移动到1010队列
+    handleM1010Change(virtualId) {
       const q1008 = this.queues[0]; // 1008队列
-      const q1009 = this.queues.find((q) => q.id === 15); // 1009队列
+      const q1010 = this.queues.find((q) => q.id === 15); // 1010队列
       const rejectQueue = this.queues.find((q) => q.id === 16); // 剔除口队列
-      if (!q1009 || !rejectQueue) {
-        this.addLog('M1009处理失败：1009队列或剔除口队列不存在', 'alarm');
+      if (!q1010 || !rejectQueue) {
+        this.addLog('M1010处理失败：1010队列或剔除口队列不存在', 'alarm');
         return;
       }
 
@@ -2922,7 +2929,7 @@ export default {
       );
       if (currentIndex === -1) {
         this.addLog(
-          `M1009虚拟ID变化：大包号 ${virtualId}，但1008队列中未找到对应包裹`,
+          `M1010虚拟ID变化：大包号 ${virtualId}，但1008队列中未找到对应包裹`,
           'alarm'
         );
         return;
@@ -2933,28 +2940,28 @@ export default {
       // 检查isInQueue状态
       if (currentItem.isInQueue !== '1') {
         this.addLog(
-          `M1009报警：大包号 ${virtualId} 的isInQueue不为1（未经过M1008确认），仍然移动到1009队列`,
+          `M1010报警：大包号 ${virtualId} 的isInQueue不为1（未经过M1008确认），仍然移动到1010队列`,
           'alarm'
         );
       }
 
-      // 将本包裹前面的包裹（未移动到1009的）移动到剔除口队列
+      // 将本包裹前面的包裹（未移动到1010的）移动到剔除口队列
       if (currentIndex > 0) {
         const precedingItems = q1008.trayInfo.splice(0, currentIndex);
         precedingItems.forEach((item) => {
           rejectQueue.trayInfo.push(item);
         });
         this.addLog(
-          `M1009处理：大包号 ${virtualId} 前面有 ${precedingItems.length} 个包裹未到达M1009，已移动到剔除口队列`
+          `M1010处理：大包号 ${virtualId} 前面有 ${precedingItems.length} 个包裹未到达M1010，已移动到剔除口队列`
         );
       }
 
-      // 将本包裹从1008队列移除并加入1009队列
+      // 将本包裹从1008队列移除并加入1010队列
       const [movedItem] = q1008.trayInfo.splice(0, 1);
-      q1009.trayInfo.push(movedItem);
+      q1010.trayInfo.push(movedItem);
 
       this.addLog(
-        `M1009确认包裹通过：大包号 ${virtualId} 已从1008队列移动到1009队列（1009当前 ${q1009.trayInfo.length} 件）`
+        `M1010确认包裹通过：大包号 ${virtualId} 已从1008队列移动到1010队列（1010当前 ${q1010.trayInfo.length} 件）`
       );
 
       // 刷新当前选中队列显示
@@ -2968,7 +2975,7 @@ export default {
         });
       }
     },
-    // 分拣口进货处理：虚拟ID变化 → 取进货ID → 从1009队列移入对应分拣口队列
+    // 分拣口进货处理：虚拟ID变化 → 取进货ID → 从1010队列移入对应分拣口队列
     handleSortPortEntrySuccess(portNo) {
       // 1. 根据分拣口号获取对应的进货ID（大包号，即六面扫条码号）
       const sortPortIdMap = {
@@ -3003,14 +3010,14 @@ export default {
 
       this.addLog(`分拣口${portNo}虚拟ID变化，进货ID（大包号）：${entryId}`);
 
-      // 2. 在1009队列（id=15）中查找匹配的包裹（条码匹配 + 目的地匹配本分拣口）
-      const q1009Index = this.queues.findIndex((q) => q.id === 15);
-      const q1009 = this.queues[q1009Index];
-      if (!q1009) {
-        this.addLog(`分拣口${portNo}进货处理失败：1009队列不存在`);
+      // 2. 在1010队列（id=15）中查找匹配的包裹（条码匹配 + 目的地匹配本分拣口）
+      const q1010Index = this.queues.findIndex((q) => q.id === 15);
+      const q1010 = this.queues[q1010Index];
+      if (!q1010) {
+        this.addLog(`分拣口${portNo}进货处理失败：1010队列不存在`);
         return;
       }
-      const trayIndex = q1009.trayInfo.findIndex(
+      const trayIndex = q1010.trayInfo.findIndex(
         (item) =>
           (item.packageNo || '').trim() === entryId &&
           item.allocatedPortNo === portNo
@@ -3018,21 +3025,21 @@ export default {
 
       if (trayIndex === -1) {
         this.addLog(
-          `分拣口${portNo}虚拟ID变化，但1009队列未找到大包号 ${entryId} 且目的地为分拣口${portNo} 的包裹，跳过`
+          `分拣口${portNo}虚拟ID变化，但1010队列未找到大包号 ${entryId} 且目的地为分拣口${portNo} 的包裹，跳过`
         );
         return;
       }
 
-      // 3. 从1009队列移除该包裹
-      const [movedTray] = q1009.trayInfo.splice(trayIndex, 1);
+      // 3. 从1010队列移除该包裹
+      const [movedTray] = q1010.trayInfo.splice(trayIndex, 1);
 
       // 4. 加入对应分拣口队列（queues[portNo]）
       const targetQueueIndex = portNo; // queues[1]=分拣口1, queues[13]=分拣口13
       const targetQueue = this.queues[targetQueueIndex];
       if (!targetQueue) {
         this.addLog(`分拣口${portNo}对应队列不存在，包裹 ${entryId} 无法移入`);
-        // 回滚：将包裹放回1009队列
-        q1009.trayInfo.splice(trayIndex, 0, movedTray);
+        // 回滚：将包裹放回1010队列
+        q1010.trayInfo.splice(trayIndex, 0, movedTray);
         return;
       }
 
@@ -3040,7 +3047,7 @@ export default {
 
       // 6. 刷新当前选中的队列显示
       if (
-        this.selectedQueueIndex === q1009Index ||
+        this.selectedQueueIndex === q1010Index ||
         this.selectedQueueIndex === targetQueueIndex
       ) {
         this.$nextTick(() => {
@@ -3049,7 +3056,7 @@ export default {
       }
 
       this.addLog(
-        `大包 ${entryId} 已从1009队列移入${targetQueue.queueName}（当前 ${targetQueue.trayInfo.length} 件）`
+        `大包 ${entryId} 已从1010队列移入${targetQueue.queueName}（当前 ${targetQueue.trayInfo.length} 件）`
       );
       this.$message.success(`大包 ${entryId} 已进入${targetQueue.queueName}`);
 
@@ -3286,14 +3293,13 @@ export default {
       forbidBitAdds.forEach((add) => {
         ipcRenderer.send('writeSingleValueToPLC', add, true);
       });
-      this.addLog('全线清空：所有分拣口已禁止进货（true）', 'running');
 
       // 第二步：2秒后所有分拣口发送 false（允许进货），持续2秒
       setTimeout(() => {
         forbidBitAdds.forEach((add) => {
           ipcRenderer.send('writeSingleValueToPLC', add, false);
         });
-        this.addLog('全线清空：所有分拣口已允许进货（false）');
+        this.addLog('全线清空：所有分拣口禁止命令已处理');
 
         // 第三步：再2秒后取消所有分拣口的PLC写入
         setTimeout(() => {
@@ -3314,7 +3320,7 @@ export default {
       candidates.sort((a, b) => a.portNo - b.portNo);
 
       // 计算每个分拣口的当前负载
-      const q1009 = this.queues.find((q) => q.id === 15);
+      const q1010 = this.queues.find((q) => q.id === 15);
       const portLoads = candidates
         .map((port) => {
           const queueId = port.portNo + 1;
@@ -3328,13 +3334,13 @@ export default {
           const q1008Count = this.queues[0].trayInfo.filter(
             (item) => item.allocatedPortNo === port.portNo
           ).length;
-          // 1009队列中已分配该口目的地的包裹数量
-          const q1009Count = q1009
-            ? q1009.trayInfo.filter(
+          // 1010队列中已分配该口目的地的包裹数量
+          const q1010Count = q1010
+            ? q1010.trayInfo.filter(
                 (item) => item.allocatedPortNo === port.portNo
               ).length
             : 0;
-          const currentLoad = portQueueCount + q1008Count + q1009Count;
+          const currentLoad = portQueueCount + q1008Count + q1010Count;
           return { port, currentLoad };
         })
         .filter(Boolean);
