@@ -203,11 +203,7 @@
                   v-for="marker in queueMarkers"
                   :key="marker.id"
                   class="queue-marker"
-                  :class="{
-                    'queue-marker--locked':
-                      queues.find((q) => q.id === marker.queueId)?.isLock ===
-                      '1'
-                  }"
+                  :class="getQueueMarkerClass(marker.queueId)"
                   :data-x="marker.x"
                   :data-y="marker.y"
                   @click="handleQueueMarkerClick(marker.queueId)"
@@ -234,6 +230,15 @@
                     @click.stop="handleUnlockQueue(marker.queueId)"
                   >
                     <i class="el-icon-lock"></i>
+                  </div>
+                  <div
+                    v-if="
+                      queues.find((q) => q.id === marker.queueId)
+                        ?.trayStatus === '3'
+                    "
+                    class="queue-marker-fail-overlay"
+                  >
+                    <i class="el-icon-info"></i>
                   </div>
                 </div>
                 <!-- DBW12 光电信号--1 -->
@@ -1260,6 +1265,13 @@
                   type="success"
                   style="margin-left: 4px"
                   >空托已返回</el-tag
+                >
+                <el-tag
+                  v-else-if="queue.trayStatus === '3'"
+                  size="mini"
+                  type="danger"
+                  style="margin-left: 4px"
+                  >AGV调用失败</el-tag
                 >
               </div>
             </div>
@@ -3138,7 +3150,8 @@ export default {
         return;
       }
 
-      // 1. 调用MCS接口通知AGV取货（必须成功才继续后续操作）
+      // 1. 调用MCS接口通知AGV取货
+      let mcsSuccess = false;
       try {
         // 队列有多少包就生成多少个bindList
         const bindList = (queue.trayInfo || []).map((tray) => {
@@ -3177,10 +3190,10 @@ export default {
             `MCS接口调用失败，分拣口${portNo}，错误码：${errCode}，原因：${errMsg}`,
             'alarm'
           );
-          // 接口调用失败，不往下继续执行
-          return;
+        } else {
+          this.addLog(`MCS接口调用成功，分拣口${portNo}，通知AGV取货`);
+          mcsSuccess = true;
         }
-        this.addLog(`MCS接口调用成功，分拣口${portNo}，通知AGV取货`);
       } catch (err) {
         console.error('MCS接口调用失败:', err);
         this.addLog(
@@ -3189,12 +3202,18 @@ export default {
           }`,
           'alarm'
         );
-        // 网络异常，不继续执行
-        return;
       }
 
-      // 2. 锁定队列（MCS成功后更新WCS队列状态）
-      this.syncAgvStatusToBackend(queue.id, '0', '1');
+      // 2. 更新队列状态（成功设置0:等待取货，失败设置3:AGV调用失败）
+      if (mcsSuccess) {
+        this.syncAgvStatusToBackend(queue.id, '0', '1');
+      } else {
+        this.syncAgvStatusToBackend(queue.id, '3', '1');
+        this.addLog(
+          `分拣口${portNo} AGV调用失败，队列状态已更新为失败`,
+          'alarm'
+        );
+      }
 
       // 3. 发送PLC分拣口禁止进货命令 DB1001.DBW102 对应位
       const forbidBitAdd = `W_DBW102_BIT${queueIndex - 1}`;
@@ -3911,6 +3930,14 @@ export default {
         this.$message.error('托盘下移失败，请重试');
       }
     },
+    // 获取队列标记的CSS类
+    getQueueMarkerClass(queueId) {
+      const queue = this.queues.find((q) => q.id === queueId);
+      return {
+        'queue-marker--locked': queue?.isLock === '1',
+        'queue-marker--failed': queue?.trayStatus === '3'
+      };
+    },
     // 点击队列标识
     handleQueueMarkerClick(queueId) {
       // 展开队列面板
@@ -3934,8 +3961,8 @@ export default {
         type: 'warning'
       })
         .then(() => {
-          // 只更新isLock，不覆盖trayStatus
-          this.syncAgvStatusToBackend(queueId, null, '0');
+          // 解锁并清空队列状态
+          this.syncAgvStatusToBackend(queueId, '', '0');
           this.addLog(`队列「${queue.queueName}」已解锁`, 'running');
           this.$message.success(`队列「${queue.queueName}」已解锁`);
         })
@@ -5314,6 +5341,29 @@ export default {
               .queue-marker-lock-overlay:hover {
                 background: #e6413e;
                 transform: scale(1.2);
+              }
+
+              // AGV调用失败样式
+              .queue-marker--failed {
+                border-color: rgba(230, 162, 60, 0.7) !important;
+                background: rgba(60, 40, 10, 0.85) !important;
+              }
+
+              .queue-marker-fail-overlay {
+                position: absolute;
+                top: -6px;
+                left: -6px;
+                width: 16px;
+                height: 16px;
+                background: #e6a23c;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                color: #fff;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+                z-index: 10;
               }
 
               .special-queue:hover {
