@@ -2707,7 +2707,7 @@ export default {
 
       // 1. 条码为空
       if (!barcode) {
-        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
         }, 2000);
@@ -2717,7 +2717,7 @@ export default {
 
       // 2. NoRead 判断（关键字识别）
       if (barcode.indexOf('NoRead') !== -1) {
-        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
         }, 2000);
@@ -2731,7 +2731,7 @@ export default {
       // 3. 多码判断（逗号分隔）
       const parts = barcode.split(',');
       if (parts.length > 1) {
-        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
         }, 2000);
@@ -2744,7 +2744,7 @@ export default {
       // 多码判断：[xxxx][xxxx] 格式
       const bracketMatches = barcode.match(/\[[^\]]*\]/g);
       if (bracketMatches && bracketMatches.length >= 2) {
-        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 0);
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
         }, 2000);
@@ -3270,6 +3270,37 @@ export default {
         ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
       }, 2000);
     },
+    // 全线清空时给PLC发送的命令：所有分拣口先禁止进货2秒，再允许进货2秒，最后取消写入
+    clearAllSortPortsForLineClear() {
+      // 分拣口1-13对应 W_DBW102_BIT0 - W_DBW102_BIT12
+      const portCount = 13;
+      const forbidBitAdds = [];
+      for (let i = 0; i < portCount; i++) {
+        forbidBitAdds.push(`W_DBW102_BIT${i}`);
+      }
+
+      // 第一步：所有分拣口发送 true（禁止进货），持续2秒
+      forbidBitAdds.forEach((add) => {
+        ipcRenderer.send('writeSingleValueToPLC', add, true);
+      });
+      this.addLog('全线清空：所有分拣口已禁止进货（true）', 'running');
+
+      // 第二步：2秒后所有分拣口发送 false（允许进货），持续2秒
+      setTimeout(() => {
+        forbidBitAdds.forEach((add) => {
+          ipcRenderer.send('writeSingleValueToPLC', add, false);
+        });
+        this.addLog('全线清空：所有分拣口已允许进货（false）');
+
+        // 第三步：再2秒后取消所有分拣口的PLC写入
+        setTimeout(() => {
+          forbidBitAdds.forEach((add) => {
+            ipcRenderer.send('cancelWriteToPLC', add);
+          });
+          this.addLog('全线清空：已取消所有分拣口PLC写入');
+        }, 2000);
+      }, 2000);
+    },
     // 分拣口分配算法
     allocateSortPort(packageSize) {
       // 根据包裹大小过滤可用分拣口（排除异常口）
@@ -3458,11 +3489,11 @@ export default {
           type: 'warning'
         })
           .then(() => {
-            // 先处理锁定的分拣口：解锁 + 发送PLC解锁信号
+            // 所有分拣口发送PLC清空信号：先2秒true（禁止进货），再2秒false（允许进货），最后取消写入
+            this.clearAllSortPortsForLineClear();
+            // 处理锁定的分拣口：解锁后端
             this.queues.forEach((queue, index) => {
               if (queue.isLock === '1') {
-                // 发送PLC解除禁止进货信号
-                this.clearPlcForbidPort(index);
                 this.addLog(
                   `全线清空：分拣口${index}已锁定，执行解锁`,
                   'running'
