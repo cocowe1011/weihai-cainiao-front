@@ -655,7 +655,7 @@ var variables = {
   W_DBW50: 'DB1001,INT50', // WCS修改电机编号
   W_DBW52: 'DB1001,INT52', // WCS修改目的地
   W_DBB54: 'DB1001,S54.28', // WCS下修改模拟ID
-  W_DBW100: 'DB1001,INT100', // WCS下发修改命令
+  W_DBW100: 'DB1001,INT100', // WCS系统全部占用信号（1=全满或全AGV运输，0=有空闲）
   W_DBW102_BIT0: 'DB1001,X103.0', // 分拣口01禁止进货
   W_DBW102_BIT1: 'DB1001,X103.1', // 分拣口02禁止进货
   W_DBW102_BIT2: 'DB1001,X103.2', // 分拣口03禁止进货
@@ -674,12 +674,13 @@ var variables = {
   W_DBW102_BIT15: 'DB1001,X102.7' // 备用
 };
 
-var writeStrArr = [0, 0, 0, 0];
+var writeStrArr = [0, 0, 0, 0, 0];
 var writeAddArr = [
   'W_DBW0', // WCS看门狗心跳
   'W_DBW2', // WCS-全线启动
   'W_DBW4', // WCS-全线停止
-  'W_DBW6' // WCS-故障复位
+  'W_DBW6', // WCS-故障复位
+  'W_DBW100'
 ];
 
 // 给PLC写值

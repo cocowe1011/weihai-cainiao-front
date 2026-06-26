@@ -3044,8 +3044,10 @@ export default {
       }
 
       targetQueue.trayInfo.push(movedTray);
+      // 分拣口包裹数量变化，检查并更新DBW100
+      this.checkAndWriteDBW100();
 
-      // 6. 刷新当前选中的队列显示
+      // 6. 刷新当前选中队列显示
       if (
         this.selectedQueueIndex === q1010Index ||
         this.selectedQueueIndex === targetQueueIndex
@@ -3211,6 +3213,29 @@ export default {
         ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
       }, 2000);
     },
+    // 检查系统状态并写入DBW100（分拣口满容量/AGV运输状态信号）
+    // 条件1：所有分拣口都达到最大容量 → 写1
+    // 条件2：所有分拣口队列的状态都是AGV运输状态（trayStatus='0'或'1'） → 写1
+    // 否则 → 写0
+    checkAndWriteDBW100() {
+      // 检查所有分拣口（1~13）是否都达到最大容量
+      const allPortsFull = this.sortPortConfig.every((port) => {
+        const queue = this.queues[port.portNo];
+        if (!queue) return false;
+        return queue.trayInfo.length >= port.maxCapacity;
+      });
+
+      // 检查所有分拣口队列的状态是否都是AGV运输状态
+      // AGV运输状态：trayStatus='0'（等待AGV取货）或'1'（AGV取货完成）
+      const allQueuesInAgv = this.sortPortConfig.every((port) => {
+        const queue = this.queues[port.portNo];
+        if (!queue) return false;
+        return queue.trayStatus === '0' || queue.trayStatus === '1';
+      });
+
+      const dbw100Value = allPortsFull || allQueuesInAgv ? 1 : 0;
+      ipcRenderer.send('writeValuesToPLC', 'W_DBW100', dbw100Value);
+    },
     // 启动 MCS/AGV 队列状态轮询
     startMcsPolling() {
       if (this.mcsPollingTimer) {
@@ -3266,6 +3291,8 @@ export default {
               );
             }
           });
+          // 数据库状态同步后检查并更新DBW100
+          this.checkAndWriteDBW100();
         })
         .catch((err) => {
           console.error('轮询队列AGV状态失败:', err);
@@ -3515,6 +3542,8 @@ export default {
             this.queues.forEach((queue) => {
               queue.trayInfo = [];
             });
+            // 全线清空后检查并更新DBW100
+            this.checkAndWriteDBW100();
             this.nowScanTrayInfo = {};
             this.runningLogs = []; // 修改为空数组
             this.alarmLogs = []; // 修改为空数组
@@ -3981,6 +4010,8 @@ export default {
           const queue = this.queues[queueId - 1];
           if (trayStatus != null) queue.trayStatus = trayStatus;
           if (isLock != null) queue.isLock = isLock;
+          // AGV状态变化后检查并更新DBW100
+          this.checkAndWriteDBW100();
         })
         .catch((err) => {
           console.error('同步AGV状态到后端失败:', err);
@@ -4037,6 +4068,8 @@ export default {
         })
         .finally(() => {
           this._queueInitDone = true;
+          // 队列数据加载完成后检查并更新DBW100
+          this.checkAndWriteDBW100();
         });
     },
     // 切换到报警日志时清除未读状态
