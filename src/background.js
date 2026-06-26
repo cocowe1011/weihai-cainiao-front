@@ -30,7 +30,6 @@ const fs = require('fs');
 var appTray = null;
 let closeStatus = false;
 var conn = new nodes7();
-var connFast = new nodes7(); // 快速扫描连接 - 仅读取DBW16，100ms周期
 
 // 读取缩放配置文件（D://weihai-cainiao-front/config/zoom.json，升级不覆盖）
 function readZoomConfig() {
@@ -295,7 +294,6 @@ app.on('ready', () => {
   ipcMain.on('conPLC', (event, arg1, arg2) => {
     if (process.env.NODE_ENV === 'production') {
       conPLC();
-      conPLCFast();
     }
     // setInterval(() => {
     //   console.log(writeStrArr.toString());
@@ -526,7 +524,7 @@ function conPLC() {
           conn.addItems('DBW1248'); // 分拣口13计数
           setInterval(() => {
             conn.readAllItems(valuesReady);
-          }, 300);
+          }, 200);
           setInterval(() => {
             // nodes7 代码
             conn.writeItems(writeAddArr, writeStrArr, valuesWritten);
@@ -539,55 +537,6 @@ function conPLC() {
     .catch((err) => {
       logger.info('config error!');
     });
-}
-
-// 快速扫描连接 - 仅读取DBW16（对接WCS信号），100ms周期
-// 目的：目的地请求(bit0)脉冲可能很短，300ms扫描会漏读
-function conPLCFast() {
-  logger.info('开始连接PLC（快速扫描DBW16）');
-  HttpUtil.get('/cssConfig/getConfig')
-    .then((res) => {
-      if (!res.data.plcPort) {
-        logger.info('快速扫描配置查询失败，3秒后重试');
-        setTimeout(() => conPLCFast(), 3000);
-        return false;
-      }
-      connFast.initiateConnection(
-        {
-          port: Number(res.data.plcPort),
-          host: res.data.plcIp,
-          rack: 0,
-          slot: 1,
-          debug: false
-        },
-        (err) => {
-          if (typeof err !== 'undefined') {
-            logger.info('快速扫描连接PLC失败' + JSON.stringify(err));
-            setTimeout(() => conPLCFast(), 3000);
-            return false;
-          }
-          connFast.setTranslationCB(function (tag) {
-            return variables[tag];
-          });
-          logger.info('快速扫描连接PLC成功');
-          connFast.addItems('DBW16');
-          setInterval(() => {
-            connFast.readAllItems(valuesReadyFast);
-          }, 100);
-        }
-      );
-    })
-    .catch((err) => {
-      logger.info('快速扫描config error!');
-      setTimeout(() => conPLCFast(), 3000);
-    });
-}
-
-function valuesReadyFast(anythingBad, values) {
-  if (anythingBad) {
-    console.log('快速扫描读取异常');
-  }
-  mainWindow.webContents.send('receivedFastMsg', values);
 }
 
 let times = 1;

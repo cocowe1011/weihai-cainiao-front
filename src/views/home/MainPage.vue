@@ -2461,8 +2461,8 @@ export default {
       this.photoelectricSignal2.bit15 = getBit(word14, 7);
 
       // DBW16 对接WCS信号
-      // bit0(目的地请求)已改由快速扫描(100ms)单独更新，见下方 receivedFastMsg
       let word16 = this.convertToWord(values.DBW16 ?? 0);
+      this.wcsDockWord16.bit0 = getBit(word16, 8);
       this.wcsDockWord16.bit1 = getBit(word16, 9);
       this.wcsDockWord16.bit2 = getBit(word16, 10);
       this.wcsDockWord16.bit3 = getBit(word16, 11);
@@ -2518,13 +2518,6 @@ export default {
       this.sortPortPlcCounts[11] = Number(values.DBW1244 ?? 0);
       this.sortPortPlcCounts[12] = Number(values.DBW1246 ?? 0);
       this.sortPortPlcCounts[13] = Number(values.DBW1248 ?? 0);
-    });
-    // 快速扫描DBW16（100ms周期）- 仅更新bit0（目的地请求）
-    // PLC脉冲可能短于300ms，单独用第二个连接100ms扫描确保不漏读
-    ipcRenderer.on('receivedFastMsg', (event, values) => {
-      const getBit = (word, bitIndex) => ((word >> bitIndex) & 1).toString();
-      let word16 = this.convertToWord(values.DBW16 ?? 0);
-      this.wcsDockWord16.bit0 = getBit(word16, 8);
     });
     // 给PLC数据加载时间
     setTimeout(() => {

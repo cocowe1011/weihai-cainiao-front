@@ -399,14 +399,6 @@ export default {
       this.plcValues = values || {};
     };
     ipcRenderer.on('receivedMsg', this.ipcHandler);
-    // receivedFastMsg: DBW16快速扫描(100ms)，用最新值覆盖plcValues.DBW16
-    // 确保弹窗Bit解析中DBW16的bit0与实际触发一致
-    this.fastIpcHandler = (event, values) => {
-      if (values.DBW16 !== undefined) {
-        this.plcValues = { ...this.plcValues, DBW16: values.DBW16 };
-      }
-    };
-    ipcRenderer.on('receivedFastMsg', this.fastIpcHandler);
     // 不在挂载时获取数据，只有打开面板时才交互
   },
   // 3. 组件销毁清理
@@ -416,10 +408,6 @@ export default {
     if (this.ipcHandler) {
       ipcRenderer.removeListener('receivedMsg', this.ipcHandler);
       this.ipcHandler = null;
-    }
-    if (this.fastIpcHandler) {
-      ipcRenderer.removeListener('receivedFastMsg', this.fastIpcHandler);
-      this.fastIpcHandler = null;
     }
     // 清理所有定时器
     if (this.warningTimeOut) {
