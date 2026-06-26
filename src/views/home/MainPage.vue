@@ -2717,7 +2717,7 @@ export default {
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
-        }, 2000);
+        }, 500);
         this.addLog(
           '收到目的地请求信号，但当前无条码数据，目的地写999',
           'alarm'
@@ -2730,7 +2730,7 @@ export default {
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
-        }, 2000);
+        }, 500);
         this.addLog(
           `收到目的地请求信号，六面扫未读到条码（${barcode}），报警：条码无效，目的地写999`,
           'alarm'
@@ -2744,7 +2744,7 @@ export default {
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
-        }, 2000);
+        }, 500);
         this.addLog(
           `收到目的地请求信号，六面扫读到多个条码（${barcode}），报警：条码无效，目的地写999`,
           'alarm'
@@ -2757,7 +2757,7 @@ export default {
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
-        }, 2000);
+        }, 500);
         this.addLog(
           `收到目的地请求信号，六面扫读到多码格式条码（${barcode}），报警：条码无效，目的地写999`,
           'alarm'
@@ -2831,13 +2831,13 @@ export default {
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', destinationCode);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
-        }, 2000);
+        }, 500);
 
         // 6. 写入虚拟ID DB1001.DBB10-39
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBB10', barcode);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBB10');
-        }, 2000);
+        }, 500);
         this.addLog(
           `分配分拣口${port.portNo}（${
             port.sizeType === 'large' ? '大件' : '小件'
@@ -3124,7 +3124,7 @@ export default {
         );
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
-        }, 2000);
+        }, 1000);
         return;
       }
 
@@ -3211,7 +3211,7 @@ export default {
       );
       setTimeout(() => {
         ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
-      }, 2000);
+      }, 1000);
     },
     // 检查系统状态并写入DBW100（分拣口满容量/AGV运输状态信号）
     // 条件1：所有分拣口都达到最大容量 → 写1
@@ -3305,7 +3305,7 @@ export default {
       this.addLog(`已解除分拣口${queueIndex}禁止进货，${forbidBitAdd}=false`);
       setTimeout(() => {
         ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
-      }, 2000);
+      }, 1000);
     },
     // 全线清空时给PLC发送的命令：所有分拣口先禁止进货2秒，再允许进货2秒，最后取消写入
     clearAllSortPortsForLineClear() {
