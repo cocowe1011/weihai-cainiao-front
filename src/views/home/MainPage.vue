@@ -2711,7 +2711,10 @@ export default {
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
         }, 2000);
-        this.addLog('收到目的地请求信号，但当前无条码数据，目的地写0', 'alarm');
+        this.addLog(
+          '收到目的地请求信号，但当前无条码数据，目的地写999',
+          'alarm'
+        );
         return;
       }
 
@@ -2722,7 +2725,7 @@ export default {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
         }, 2000);
         this.addLog(
-          `收到目的地请求信号，六面扫未读到条码（${barcode}），报警：条码无效，目的地写0`,
+          `收到目的地请求信号，六面扫未读到条码（${barcode}），报警：条码无效，目的地写999`,
           'alarm'
         );
         return;
@@ -2736,7 +2739,7 @@ export default {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
         }, 2000);
         this.addLog(
-          `收到目的地请求信号，六面扫读到多个条码（${barcode}），报警：条码无效，目的地写0`,
+          `收到目的地请求信号，六面扫读到多个条码（${barcode}），报警：条码无效，目的地写999`,
           'alarm'
         );
         return;
@@ -2749,7 +2752,7 @@ export default {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
         }, 2000);
         this.addLog(
-          `收到目的地请求信号，六面扫读到多码格式条码（${barcode}），报警：条码无效，目的地写0`,
+          `收到目的地请求信号，六面扫读到多码格式条码（${barcode}），报警：条码无效，目的地写999`,
           'alarm'
         );
         return;
@@ -3298,8 +3301,8 @@ export default {
             ipcRenderer.send('cancelWriteToPLC', add);
           });
           this.addLog('全线清空：已取消所有分拣口PLC写入');
-        }, 2000);
-      }, 2000);
+        }, 1000);
+      }, 1000);
     },
     // 分拣口分配算法
     allocateSortPort(packageSize) {
