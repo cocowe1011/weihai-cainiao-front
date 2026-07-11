@@ -1,112 +1,75 @@
 /**
- * 大包 mock 数据（来源：大包列表 CSV 样例行）
+ * 将菜鸟大包接口 data 映射为内部包裹对象
+ * 缺字段存空；smallPackageQuantity > 1 为大包，<= 1 为小包
+ * @param {object} data 菜鸟接口 data
+ * @param {string} barcode 扫码条码
+ * @returns {object}
  */
-const MOCK_PACKAGE_TEMPLATES = [
-  {
-    packageNo: 'KRRM04321276',
-    packageSize: 'large',
-    customerSource: 'AE海运',
-    packageCreateTime: '2026-05-14 11:32:47',
-    sourceWarehouse: '威海心怡优选分拨仓',
-    chargeWeight: '27400.000',
-    expectedQty: '43',
-    actualQty: '43',
-    channel: 'L_AE_EXPRESS_SEA_XTW_CJ',
-    packageStatus: '已装箱',
-    destinationCountry: '韩国',
+export function mapCainiaoToPackage(data, barcode) {
+  const code = (barcode || '').trim();
+  const qty =
+    data && data.smallPackageQuantity != null
+      ? String(data.smallPackageQuantity)
+      : '';
+  const qtyNum = Number(qty);
+  const packageSize = qtyNum > 1 ? 'large' : 'small';
+
+  return {
+    packageNo: (data && data.bigPackageCode) || code,
+    packageSize,
+    customerSource: '',
+    packageCreateTime: '',
+    sourceWarehouse: '',
+    chargeWeight:
+      data && data.standardWeight != null ? String(data.standardWeight) : '',
+    packingWeight:
+      data && data.packingWeight != null ? String(data.packingWeight) : '',
+    expectedQty: qty,
+    actualQty: qty,
+    channel: (data && data.laneCode) || '',
+    packageStatus: '',
+    destinationCountry: '',
     departurePort: '',
     destinationPort: '',
     mblNo: '',
     subBillNo: '',
     businessNo: '',
-    containerNo: 'LYGU4031358',
-    sealNo: '',
-    packingTime: '2026-05-14 14:24:03',
-    packer: '韩龙盼',
-    handoverTime: '2026-05-14 11:33:10',
-    handoverPerson: '崔言芹',
-    customsPort: '',
-    billReceiver: '',
-    batchNo: 'D001563-W260514-0018',
-    plateNo: 'LFCE621'
-  },
-  {
-    packageNo: 'KRV2VDIR00000041',
-    packageSize: 'small',
-    customerSource: 'AE海运',
-    packageCreateTime: '2026-05-14 17:23:34',
-    sourceWarehouse: 'TRAN_STORE_30320880',
-    chargeWeight: '400.000',
-    expectedQty: '1',
-    actualQty: '1',
-    channel: 'L_AE_EXPRESS_XTWSEA_ACT_V2V',
-    packageStatus: '已装箱',
-    destinationCountry: '韩国',
-    departurePort: '',
-    destinationPort: '',
-    mblNo: '',
-    subBillNo: '',
-    businessNo: '*TEST20260515',
     containerNo: '',
     sealNo: '',
-    packingTime: '2026-05-15 11:04:43',
-    packer: '蔡荧琳',
+    packingTime: '',
+    packer: '',
     handoverTime: '',
     handoverPerson: '',
     customsPort: '',
     billReceiver: '',
-    batchNo: 'D000486-W260514-0004',
-    plateNo: ''
-  },
-  {
-    packageNo: 'KRRM04320531',
-    packageSize: 'large',
-    customerSource: 'AE海运',
-    packageCreateTime: '2026-05-14 10:33:37',
-    sourceWarehouse: '威海心怡优选分拨仓',
-    chargeWeight: '7170.000',
-    expectedQty: '1',
-    actualQty: '1',
-    channel: 'L_AE_EXPRESS_SEA_XTW_CJ',
-    packageStatus: '已装箱',
-    destinationCountry: '韩国',
-    departurePort: '',
-    destinationPort: '',
-    mblNo: '',
-    subBillNo: '',
-    businessNo: '',
-    containerNo: 'CICU9807371',
-    sealNo: '',
-    packingTime: '2026-05-14 13:49:26',
-    packer: '韩龙盼',
-    handoverTime: '2026-05-14 11:02:19',
-    handoverPerson: '谭业臣',
-    customsPort: '',
-    billReceiver: '',
-    batchNo: 'D001563-W260514-0013',
-    plateNo: 'LFEF086'
-  }
-];
-
-const DEFAULT_TEMPLATE = MOCK_PACKAGE_TEMPLATES[0];
+    batchNo: '',
+    plateNo: '',
+    barcode: code
+  };
+}
 
 /**
- * 根据扫码条码 mock 包裹信息
+ * 根据扫码条码 mock 包裹信息（按菜鸟样例形态，固定返回大包）
  * @param {string} barcode
  * @returns {object}
  */
 export function mockPackageByBarcode(barcode) {
   const code = (barcode || '').trim();
-  const matched = MOCK_PACKAGE_TEMPLATES.find(
-    (item) => item.packageNo === code
+  return mapCainiaoToPackage(
+    {
+      bigPackageCode: code,
+      standardWeight: '18147',
+      grossWeight: '18070',
+      netWeight: '17947',
+      labelWeight: '18',
+      packingWeight: '200',
+      volume: null,
+      volumeUnit: null,
+      laneCode: 'L_AE_EXPRESS_SGSEA_KR_V2V',
+      smallPackageQuantity: '18'
+    },
+    code
   );
-  const base = matched ? { ...matched } : { ...DEFAULT_TEMPLATE };
-
-  if (!matched) {
-    base.packageNo = code;
-  }
-
-  return { ...base, barcode: code };
 }
 
 /**
@@ -154,10 +117,8 @@ export function toOrderInfoPayload(pkg) {
 export function toScanDisplayInfo(pkg) {
   return {
     packageNo: pkg.packageNo,
-    customerSource: pkg.customerSource,
-    sourceWarehouse: pkg.sourceWarehouse,
     channel: pkg.channel,
-    destinationCountry: pkg.destinationCountry,
-    batchNo: pkg.batchNo
+    packingWeight: pkg.packingWeight,
+    expectedQty: pkg.expectedQty
   };
 }

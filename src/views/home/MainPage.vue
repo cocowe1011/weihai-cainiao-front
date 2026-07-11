@@ -21,22 +21,6 @@
               </div>
               <div class="data-card">
                 <div class="data-card-border">
-                  <div class="data-card-border-borderTop">客户来源</div>
-                  <div class="data-card-border-borderDown">
-                    {{ nowScanTrayInfo.customerSource || '--' }}
-                  </div>
-                </div>
-              </div>
-              <div class="data-card">
-                <div class="data-card-border">
-                  <div class="data-card-border-borderTop">来源仓</div>
-                  <div class="data-card-border-borderDown">
-                    {{ nowScanTrayInfo.sourceWarehouse || '--' }}
-                  </div>
-                </div>
-              </div>
-              <div class="data-card">
-                <div class="data-card-border">
                   <div class="data-card-border-borderTop">渠道</div>
                   <div class="data-card-border-borderDown">
                     {{ nowScanTrayInfo.channel || '--' }}
@@ -45,17 +29,17 @@
               </div>
               <div class="data-card">
                 <div class="data-card-border">
-                  <div class="data-card-border-borderTop">目的国</div>
+                  <div class="data-card-border-borderTop">包装重量</div>
                   <div class="data-card-border-borderDown">
-                    {{ nowScanTrayInfo.destinationCountry || '--' }}
+                    {{ nowScanTrayInfo.packingWeight || '--' }}
                   </div>
                 </div>
               </div>
               <div class="data-card">
                 <div class="data-card-border">
-                  <div class="data-card-border-borderTop">批次号</div>
+                  <div class="data-card-border-borderTop">小包数量</div>
                   <div class="data-card-border-borderDown">
-                    {{ nowScanTrayInfo.batchNo || '--' }}
+                    {{ nowScanTrayInfo.expectedQty || '--' }}
                   </div>
                 </div>
               </div>
@@ -104,6 +88,14 @@
             </button>
             <button @click="toggleButtonState('clear')">
               <i class="el-icon-delete"></i><span>全线清空</span>
+            </button>
+            <button
+              class="btn-disable-cainiao"
+              @click="toggleDisableCainiao"
+              :class="{ pressed: disableCainiao }"
+            >
+              <i class="el-icon-close"></i
+              ><span>{{ disableCainiao ? '启用菜鸟' : '停用菜鸟' }}</span>
             </button>
           </div>
         </div>
@@ -1304,9 +1296,6 @@
                     <div class="tray-info">
                       <div class="tray-info-row">
                         <span class="tray-name">{{ tray.name }}</span>
-                        <span class="tray-detail">{{
-                          tray.channel || '--'
-                        }}</span>
                         <span
                           class="tray-detail allocated-port"
                           v-if="tray.allocatedPortNo"
@@ -1320,18 +1309,15 @@
                       </div>
                       <div class="tray-info-row">
                         <span class="tray-detail"
-                          >业务编号：{{ tray.businessNo || '--' }}</span
-                        >
-                        <span class="tray-detail"
-                          >客户来源：{{ tray.customerSource || '--' }}</span
+                          >渠道：{{ tray.channel || '--' }}</span
                         >
                       </div>
                       <div class="tray-info-row">
                         <span class="tray-detail"
-                          >目的国：{{ tray.destinationCountry || '--' }}</span
+                          >包装重量：{{ tray.packingWeight || '--' }}</span
                         >
                         <span class="tray-detail"
-                          >批次号：{{ tray.batchNo || '--' }}</span
+                          >小包数量：{{ tray.expectedQty || '--' }}</span
                         >
                       </div>
                       <span class="tray-time">{{ tray.time }}</span>
@@ -1699,11 +1685,13 @@
 <script>
 import HttpUtil from '@/utils/HttpUtil';
 import HttpUtilMcs from '@/utils/HttpUtilMcs';
+import HttpUtilCainiao from '@/utils/HttpUtilCainiao';
 import moment from 'moment';
 import { ipcRenderer } from 'electron';
 import OrderQueryDialog from '@/components/OrderQueryDialog.vue';
 import {
   mockPackageByBarcode,
+  mapCainiaoToPackage,
   toOrderInfoPayload,
   toScanDisplayInfo
 } from '@/utils/packageMockData';
@@ -1728,6 +1716,8 @@ export default {
       sixScanProcessing: false,
       // 目的地请求限流时间戳（2秒内重复信号不处理）
       lastDestinationReqTime: 0,
+      // 大包分拣口循环下发游标（满容量后按 1→9 顺序循环开新口）
+      lastLargeAllocPortNo: 0,
       // 六面扫Socket连接状态
       sixScanSocketConnected: false,
       // 分拣口配置（1-9大件，10-11小件，12-13异常口）
@@ -1833,6 +1823,8 @@ export default {
         fault_reset: false,
         clear: false
       },
+      // 停用菜鸟：true 走 mock，false（默认）查菜鸟大包接口
+      disableCainiao: false,
       activeLogType: 'running',
       runningLogs: [], // 修改为空数组
       alarmLogs: [], // 修改为空数组
@@ -2231,6 +2223,7 @@ export default {
       if (!this.isDataReady) return;
       // 上升沿检测：0 -> 1 表示PLC请求下发目的地
       if (newVal === '1' && oldVal === '0') {
+        this.addLog('收到目的地请求信号', 'running');
         // 限流：2秒内重复请求不处理
         const now = Date.now();
         if (now - this.lastDestinationReqTime < 2000) {
@@ -2655,63 +2648,6 @@ export default {
       }
       this.sixScanBarcode = innerContent.trim();
     },
-    async handleSixScanUpload(barcode) {
-      if (this.sixScanProcessing) {
-        this.addLog('六面扫上货处理中，请稍候');
-        return;
-      }
-      this.sixScanProcessing = true;
-      this.addLog(`六面扫开始上货，条码：${barcode}`);
-      try {
-        const packageInfo = mockPackageByBarcode(barcode);
-        this.addLog(
-          `已Mock包裹信息，大包号：${packageInfo.packageNo}，客户来源：${
-            packageInfo.customerSource || '--'
-          }，批次号：${packageInfo.batchNo || '--'}`
-        );
-
-        const payload = toOrderInfoPayload(packageInfo);
-        const res = await HttpUtil.post('/order_info/save', payload);
-        const savedOrder = res && res.data;
-        if (!savedOrder || savedOrder.id == null) {
-          throw new Error((res && res.message) || '保存订单失败');
-        }
-
-        const queueItem = {
-          orderInfoId: savedOrder.id,
-          packageNo: packageInfo.packageNo,
-          trayTime: moment().format('YYYY-MM-DD HH:mm:ss'),
-          businessNo: packageInfo.businessNo,
-          customerSource: packageInfo.customerSource,
-          batchNo: packageInfo.batchNo,
-          destinationCountry: packageInfo.destinationCountry,
-          channel: packageInfo.channel,
-          trayStatus: '1',
-          isInQueue: '0'
-        };
-
-        this.queues[0].trayInfo.push(queueItem);
-        this.nowScanTrayInfo = toScanDisplayInfo(packageInfo);
-        this.lastProcessedBarcode = barcode;
-
-        if (this.selectedQueueIndex === 0) {
-          this.showTrays(0);
-        }
-
-        this.addLog(
-          `六面扫上货成功，大包号：${packageInfo.packageNo}，已加入1008队列（当前 ${this.queues[0].trayInfo.length} 件）`
-        );
-        this.$message.success(`大包 ${packageInfo.packageNo} 已上货`);
-      } catch (error) {
-        console.error('六面扫上货失败:', error);
-        this.$message.error(`六面扫上货失败：${error.message || '请重试'}`);
-        this.addLog(
-          `六面扫上货失败，条码：${barcode}，原因：${error.message || '请重试'}`
-        );
-      } finally {
-        this.sixScanProcessing = false;
-      }
-    },
     // 目的地请求处理入口（DBW16.bit0上升沿触发）
     // 不再依赖 sixScanBarcode watch 缓存，直接拿当前条码进行判断和mock处理
     async handleDestinationRequest() {
@@ -2786,22 +2722,30 @@ export default {
         // 老条目已移除，继续往下走，按新包裹分配目的地并入队
       }
 
-      // 5. Mock包裹数据
-      const packageInfo = mockPackageByBarcode(barcode);
+      // 5. 获取包裹数据（停用菜鸟走 mock，否则查菜鸟接口）
+      const packageInfo = await this.resolvePackageInfo(barcode);
+      if (!packageInfo) {
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
+        setTimeout(() => {
+          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+        }, 1000);
+        this.addLog(
+          `菜鸟查询未成功，已写目的地999，终止后续分配与落库，条码：${barcode}`,
+          'alarm'
+        );
+        this.$message.error('菜鸟大包查询失败，已发送999');
+        return;
+      }
       this.nowScanTrayInfo = packageInfo;
-      const packageSize = packageInfo.packageSize || 'large';
-      this.addLog(
-        `收到目的地请求信号，条码：${barcode}，大包号：${packageInfo.packageNo}，大小：${packageSize}`
-      );
-
+      const packageSize = packageInfo.packageSize;
       try {
-        // 1. 分配分拣口
-        const port = this.allocateSortPort(packageSize);
+        // 1. 分配分拣口（大包1~9循环；同一分拣口仅允许同一渠道号）
+        const port = this.allocateSortPort(packageSize, packageInfo.channel);
         if (!port) {
           throw new Error(
             `无法分配分拣口，所有${
               packageSize === 'large' ? '大件' : '小件'
-            }分拣口已满`
+            }分拣口已满或无匹配渠道号（${packageInfo.channel || '--'}）的可用口`
           );
         }
 
@@ -2864,11 +2808,9 @@ export default {
           orderInfoId: savedOrder.id,
           packageNo: packageInfo.packageNo,
           trayTime: moment().format('YYYY-MM-DD HH:mm:ss'),
-          businessNo: packageInfo.businessNo,
-          customerSource: packageInfo.customerSource,
-          batchNo: packageInfo.batchNo,
-          destinationCountry: packageInfo.destinationCountry,
           channel: packageInfo.channel,
+          packingWeight: packageInfo.packingWeight,
+          expectedQty: packageInfo.expectedQty,
           trayStatus: '1',
           allocatedPortNo: port.portNo, // 记录分配的分拣口号，用于负载统计
           destinationCode: destinationCode, // 记录发送的目的地编码
@@ -3350,7 +3292,10 @@ export default {
       }, 1000);
     },
     // 分拣口分配算法
-    allocateSortPort(packageSize) {
+    // 大包(1~9)：同渠道未满口优先续放；满后按1→9循环开新空口；一口一渠道
+    // 小包(10~11)：同渠道未满口优先，否则按口号顺序开空口；一口一渠道
+    allocateSortPort(packageSize, channel) {
+      const channelKey = (channel || '').trim();
       // 根据包裹大小过滤可用分拣口（排除异常口）
       const candidates = this.sortPortConfig.filter(
         (p) => p.sizeType === packageSize
@@ -3358,7 +3303,7 @@ export default {
       // 按portNo从小到大排序
       candidates.sort((a, b) => a.portNo - b.portNo);
 
-      // 计算每个分拣口的当前负载
+      // 计算每个分拣口的当前负载与占用渠道
       const q1010 = this.queues.find((q) => q.id === 15);
       const portLoads = candidates
         .map((port) => {
@@ -3368,37 +3313,73 @@ export default {
           if (portQueue && portQueue.isLock === '1') {
             return null;
           }
-          const portQueueCount = portQueue ? portQueue.trayInfo.length : 0;
-          // 1008队列中已分配该口目的地的包裹数量
-          const q1008Count = this.queues[0].trayInfo.filter(
-            (item) => item.allocatedPortNo === port.portNo
-          ).length;
-          // 1010队列中已分配该口目的地的包裹数量
-          const q1010Count = q1010
-            ? q1010.trayInfo.filter(
-                (item) => item.allocatedPortNo === port.portNo
-              ).length
-            : 0;
-          const currentLoad = portQueueCount + q1008Count + q1010Count;
-          return { port, currentLoad };
+          const assignedItems = [];
+          if (portQueue) {
+            assignedItems.push(...portQueue.trayInfo);
+          }
+          // 1008队列中已分配该口目的地的包裹
+          this.queues[0].trayInfo.forEach((item) => {
+            if (item.allocatedPortNo === port.portNo) {
+              assignedItems.push(item);
+            }
+          });
+          // 1010队列中已分配该口目的地的包裹
+          if (q1010) {
+            q1010.trayInfo.forEach((item) => {
+              if (item.allocatedPortNo === port.portNo) {
+                assignedItems.push(item);
+              }
+            });
+          }
+          const currentLoad = assignedItems.length;
+          const occupiedItem = assignedItems.find(
+            (item) => (item.channel || '').trim() !== ''
+          );
+          const occupiedChannel = occupiedItem
+            ? (occupiedItem.channel || '').trim()
+            : '';
+          return { port, currentLoad, occupiedChannel };
         })
         .filter(Boolean);
 
-      // 优先级1：已有包裹但未满的分拣口（优先把没满的发完）
-      const partiallyFilled = portLoads.filter(
-        (p) => p.currentLoad > 0 && p.currentLoad < p.port.maxCapacity
+      // 优先级1：已有同渠道包裹且未满的分拣口（一口一渠道，优先续满）
+      const sameChannelPartial = portLoads.filter(
+        (p) =>
+          p.currentLoad > 0 &&
+          p.currentLoad < p.port.maxCapacity &&
+          p.occupiedChannel === channelKey
       );
-      if (partiallyFilled.length > 0) {
-        return partiallyFilled[0].port;
+      if (sameChannelPartial.length > 0) {
+        return sameChannelPartial[0].port;
       }
 
-      // 优先级2：空闲的分拣口
+      // 优先级2：空闲分拣口
       const empty = portLoads.filter((p) => p.currentLoad === 0);
-      if (empty.length > 0) {
-        return empty[0].port;
+      if (empty.length === 0) {
+        return null;
       }
 
-      return null;
+      // 大包：容量满后按 1~9 顺序循环开新口
+      if (packageSize === 'large') {
+        const largePortNos = candidates.map((p) => p.portNo);
+        let startIdx = largePortNos.indexOf(this.lastLargeAllocPortNo);
+        if (startIdx < 0) {
+          startIdx = -1;
+        }
+        for (let i = 1; i <= largePortNos.length; i++) {
+          const idx = (startIdx + i) % largePortNos.length;
+          const portNo = largePortNos[idx];
+          const found = empty.find((e) => e.port.portNo === portNo);
+          if (found) {
+            this.lastLargeAllocPortNo = portNo;
+            return found.port;
+          }
+        }
+        return null;
+      }
+
+      // 小包：按口号从小到大取空口
+      return empty[0].port;
     },
     // 手动模拟 DBW16.bit0 上升沿信号（测试用）
     triggerDestinationRequest() {
@@ -3436,6 +3417,73 @@ export default {
     // 显示订单查询对话框
     showOrderQueryDialog() {
       this.orderQueryDialogVisible = true;
+    },
+    toggleDisableCainiao() {
+      const willDisable = !this.disableCainiao;
+      const confirmMsg = willDisable
+        ? '确定要停用菜鸟接口吗？停用后将使用 Mock 数据。'
+        : '确定要重新启用菜鸟接口吗？';
+      this.$confirm(confirmMsg, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
+        .then(() => {
+          this.disableCainiao = willDisable;
+          const tip = this.disableCainiao
+            ? '已停用菜鸟，包裹信息使用 Mock 数据'
+            : '已启用菜鸟，包裹信息查询菜鸟接口';
+          this.$message.success(tip);
+          this.addLog(tip);
+        })
+        .catch(() => {
+          // 用户取消，不做处理
+        });
+    },
+    // 解析包裹信息：停用菜鸟走 mock，否则查菜鸟大包接口
+    async resolvePackageInfo(barcode) {
+      if (this.disableCainiao) {
+        const packageInfo = mockPackageByBarcode(barcode);
+        this.addLog(
+          `已Mock包裹信息，大包号：${packageInfo.packageNo}，大小：${packageInfo.packageSize}`
+        );
+        return packageInfo;
+      }
+      try {
+        const res = await HttpUtilCainiao.post(
+          '/PreSupervision/getBigPackageToMCS?key=31140fca3b37427491bd3106f765eed2',
+          { bigPackageCode: barcode }
+        );
+        const codeOk =
+          res && (Number(res.code) === 200 || res.success === true);
+        const data = res && res.data;
+        const hasPackage =
+          data && (data.bigPackageCode || data.smallPackageQuantity != null);
+        if (!codeOk || !hasPackage) {
+          const errMsg = (res && res.message) || '查询菜鸟大包信息失败';
+          this.addLog(
+            `菜鸟大包查询失败，条码：${barcode}，原因：${errMsg}`,
+            'alarm'
+          );
+          return null;
+        }
+        const packageInfo = mapCainiaoToPackage(data, barcode);
+        this.addLog(
+          `菜鸟大包查询成功，大包号：${packageInfo.packageNo}，小包数：${
+            packageInfo.expectedQty || '--'
+          }，大小：${packageInfo.packageSize}`
+        );
+        return packageInfo;
+      } catch (error) {
+        console.error('菜鸟大包查询异常:', error);
+        this.addLog(
+          `菜鸟大包查询异常，条码：${barcode}，原因：${
+            error.message || '网络错误'
+          }`,
+          'alarm'
+        );
+        return null;
+      }
     },
     toggleButtonState(button) {
       if (button === 'start') {
@@ -3557,6 +3605,7 @@ export default {
             // 全线清空后检查并更新DBW100
             this.checkAndWriteDBW100();
             this.nowScanTrayInfo = {};
+            this.lastLargeAllocPortNo = 0; // 大包循环下发游标重置，下次从分拣口1开始
             this.runningLogs = []; // 修改为空数组
             this.alarmLogs = []; // 修改为空数组
             this.nowTrays = [];
@@ -3655,11 +3704,9 @@ export default {
               id: packageNo,
               name: packageNo ? `大包 ${packageNo}` : '未知大包',
               time: tray.trayTime || '',
-              businessNo: tray.businessNo || tray.orderId || '',
-              customerSource: tray.customerSource || tray.productName || '',
-              destinationCountry: tray.destinationCountry || tray.unit || '',
-              batchNo: tray.batchNo || '',
               channel: tray.channel || '',
+              packingWeight: tray.packingWeight || '',
+              expectedQty: tray.expectedQty || '',
               allocatedPortNo: tray.allocatedPortNo || '',
               destinationCode: tray.destinationCode || ''
             };
@@ -4543,6 +4590,12 @@ export default {
           }
           button.btn-reset.pressed:hover {
             background: linear-gradient(135deg, #ffc53d, #fa8c16);
+          }
+          button.btn-disable-cainiao.pressed {
+            background: linear-gradient(135deg, #8c8c8c, #595959);
+          }
+          button.btn-disable-cainiao.pressed:hover {
+            background: linear-gradient(135deg, #a6a6a6, #737373);
           }
         }
       }
