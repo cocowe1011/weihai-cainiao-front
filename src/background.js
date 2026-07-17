@@ -27,9 +27,64 @@ logger.transports.file.file = app.getPath('userData') + '/app.log';
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const mqtt = require('mqtt');
 var appTray = null;
 let closeStatus = false;
 var conn = new nodes7();
+
+// 数字孪生 MQTT（WCS 推前置仓）
+const TWIN_MQTT_URL = 'ws://mcs.sdland-sea.com:80/whwlws/mqtt';
+const TWIN_MQTT_TOPIC = '/wly/wcs/1';
+const TWIN_MQTT_USERNAME = 'wlywcs';
+const TWIN_MQTT_PASSWORD = 'wcs!@#abc';
+let twinMqttClient = null;
+let twinMqttReady = false;
+
+function initTwinMqtt() {
+  if (twinMqttClient) return;
+  const clientId = `wlywcs_twin_${process.pid}_${Date.now()}`;
+  twinMqttClient = mqtt.connect(TWIN_MQTT_URL, {
+    username: TWIN_MQTT_USERNAME,
+    password: TWIN_MQTT_PASSWORD,
+    protocolVersion: 5,
+    keepalive: 60,
+    connectTimeout: 10000,
+    reconnectPeriod: 5000,
+    clientId
+  });
+  twinMqttClient.on('connect', () => {
+    twinMqttReady = true;
+    logger.info(`数字孪生 MQTT 已连接 clientId=${clientId}`);
+  });
+  twinMqttClient.on('reconnect', () => {
+    twinMqttReady = false;
+    logger.info('数字孪生 MQTT 重连中...');
+  });
+  twinMqttClient.on('close', () => {
+    twinMqttReady = false;
+  });
+  twinMqttClient.on('error', (err) => {
+    twinMqttReady = false;
+    logger.error(
+      '数字孪生 MQTT 错误: ' + (err && err.message ? err.message : err)
+    );
+  });
+}
+
+function publishTwinMqtt(payload) {
+  if (!twinMqttClient || !twinMqttReady) {
+    return;
+  }
+  try {
+    const body =
+      typeof payload === 'string' ? payload : JSON.stringify(payload);
+    twinMqttClient.publish(TWIN_MQTT_TOPIC, body, { qos: 0 });
+  } catch (err) {
+    logger.error(
+      '数字孪生 MQTT 发布失败: ' + (err && err.message ? err.message : err)
+    );
+  }
+}
 
 // 读取缩放配置文件（D://weihai-cainiao-front/config/zoom.json，升级不覆盖）
 function readZoomConfig() {
@@ -163,6 +218,15 @@ app.on('window-all-closed', () => {
 // 应用退出时确保所有日志都被写入
 app.on('before-quit', () => {
   flushLogBuffer();
+  if (twinMqttClient) {
+    try {
+      twinMqttClient.end(true);
+    } catch (e) {
+      // ignore
+    }
+    twinMqttClient = null;
+    twinMqttReady = false;
+  }
 });
 
 // 单实例锁，防止应用被多开 - 必须在app.ready之前检查
@@ -188,6 +252,7 @@ global.sharedObject = {
 };
 let mainWindow = null;
 app.on('ready', () => {
+  initTwinMqtt();
   // Create the browser window.
   mainWindow = new BrowserWindow({
     width: 1100,
@@ -263,6 +328,10 @@ app.on('ready', () => {
   // cancelWriteToPLC - 取消PLC某个变量的写入
   ipcMain.on('cancelWriteToPLC', (event, arg1) => {
     cancelWriteToPLC(arg1);
+  });
+  // 数字孪生 MQTT 发布（由 MainPage 每秒组包后发送）
+  ipcMain.on('publishTwinMqtt', (event, payload) => {
+    publishTwinMqtt(payload);
   });
   // 获取PLC变量定义（只在组件挂载时调用一次，因为启动后不会变）
   ipcMain.handle('getPlcVariables', () => {
@@ -620,7 +689,8 @@ var variables = {
   W_DBW102_BIT12: 'DB1001,X102.4', // 分拣口13禁止进货
   W_DBW102_BIT13: 'DB1001,X102.5', // 分拣口14禁止进货
   W_DBW102_BIT14: 'DB1001,X102.6', // 分拣口15禁止进货
-  W_DBW102_BIT15: 'DB1001,X102.7' // 备用
+  W_DBW102_BIT15: 'DB1001,X102.7', // 备用
+  W_DBW104: 'DB1001,INT104' // WCS重复扫码报警（写1保持2秒后取消）
 };
 
 var writeStrArr = [0, 0, 0, 0, 0];

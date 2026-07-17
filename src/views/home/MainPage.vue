@@ -2183,6 +2183,8 @@ export default {
       },
       // AGV/MCS轮询定时器
       mcsPollingTimer: null,
+      // 数字孪生 MQTT 推送定时器
+      twinMqttTimer: null,
       // 数据准备就绪标志位
       isDataReady: false
     };
@@ -2528,9 +2530,67 @@ export default {
     setTimeout(() => {
       this.addLog('isDataReady数据加载完成');
       this.isDataReady = true;
+      this.startTwinMqttPublish();
     }, 3000);
   },
   methods: {
+    buildTwinPayload() {
+      const motors = [];
+      for (let motorId = 1; motorId <= 32; motorId++) {
+        let runningSignal = 0;
+        if (motorId <= 16) {
+          runningSignal =
+            this.motorRunningWord6[`bit${motorId - 1}`] === '1' ? 1 : 0;
+        } else {
+          runningSignal =
+            this.motorRunningWord8[`bit${motorId - 17}`] === '1' ? 1 : 0;
+        }
+        let largeBagNo = null;
+        if (motorId >= 7 && motorId <= 20) {
+          const key = `M10${String(motorId).padStart(2, '0')}`;
+          const raw = this.beltStationIds[key];
+          const trimmed = typeof raw === 'string' ? raw.trim() : '';
+          largeBagNo = trimmed || null;
+        }
+        motors.push({
+          motor_id: motorId,
+          running_signal: runningSignal,
+          large_bag_no: largeBagNo
+        });
+      }
+      const sortingChutes = [];
+      for (let chuteId = 1; chuteId <= 13; chuteId++) {
+        const bag = this.sortPortPurchaseIds[chuteId];
+        const trimmed = typeof bag === 'string' ? bag.trim() : '';
+        sortingChutes.push({
+          chute_id: chuteId,
+          package_count: Number(this.sortPortPlcCounts[chuteId] ?? 0) || 0,
+          large_bag_no: trimmed || ''
+        });
+      }
+      return {
+        timestamp: moment().format('YYYY-MM-DDTHH:mm:ss+08:00'),
+        motors,
+        sorting_chutes: sortingChutes
+      };
+    },
+    startTwinMqttPublish() {
+      this.stopTwinMqttPublish();
+      this.twinMqttTimer = setInterval(() => {
+        try {
+          ipcRenderer.send('publishTwinMqtt', this.buildTwinPayload());
+        } catch (e) {
+          console.error('数字孪生 MQTT 推送失败:', e);
+        }
+      }, 1000);
+      this.addLog('数字孪生 MQTT 推送已启动(1s)', 'running');
+    },
+    stopTwinMqttPublish() {
+      if (this.twinMqttTimer) {
+        clearInterval(this.twinMqttTimer);
+        this.twinMqttTimer = null;
+      }
+    },
     // 获取队列托盘数量
     getQueueTrayCount(queueId) {
       const queue = this.queues.find((q) => q.id === queueId);
@@ -2711,15 +2771,19 @@ export default {
         (item) => item.packageNo === barcode
       );
       if (existingIndex !== -1) {
-        // 已入队，删除老条目，使其不再参与分拣口负载计算，后续当作新包裹重新分配
-        const oldItem = this.queues[0].trayInfo.splice(existingIndex, 1)[0];
+        const oldItem = this.queues[0].trayInfo[existingIndex];
+        // 重复包裹：不删队、不重入队，写 DBW104=1 保持2秒后取消
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW104', 1);
+        setTimeout(() => {
+          ipcRenderer.send('cancelWriteToPLC', 'W_DBW104');
+        }, 2000);
         this.addLog(
-          `目的地请求：条码重复，已移除1008队列中老信息（原分拣口：${oldItem.allocatedPortNo}）：${barcode}，将按新包裹重新分配`
+          `目的地请求：条码重复，已写DBW104=1（2秒后取消），原分拣口：${
+            oldItem.allocatedPortNo || '--'
+          }，条码：${barcode}`,
+          'alarm'
         );
-        if (this.selectedQueueIndex === 0) {
-          this.showTrays(0);
-        }
-        // 老条目已移除，继续往下走，按新包裹分配目的地并入队
+        return;
       }
 
       // 5. 获取包裹数据（停用菜鸟走 mock，否则查菜鸟接口）
@@ -4161,6 +4225,8 @@ export default {
     }
     // 清除 MCS/AGV 轮询定时器
     this.stopMcsPolling();
+    // 停止数字孪生 MQTT 推送
+    this.stopTwinMqttPublish();
     // 断开六面扫Socket连接
     this.disconnectSixScan();
   }
