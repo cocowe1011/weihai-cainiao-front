@@ -2771,16 +2771,19 @@ export default {
         (item) => item.packageNo === barcode
       );
       if (existingIndex !== -1) {
-        const oldItem = this.queues[0].trayInfo[existingIndex];
-        // 重复包裹：不删队、不重入队，写 DBW104=1 保持2秒后取消
+        // 重复包裹：从1008队列删除老条目，写 DBW104=1 保持2秒后取消，不再重新入队
+        const oldItem = this.queues[0].trayInfo.splice(existingIndex, 1)[0];
+        if (this.selectedQueueIndex === 0) {
+          this.showTrays(0);
+        }
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW104', 1);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW104');
         }, 2000);
         this.addLog(
-          `目的地请求：条码重复，已写DBW104=1（2秒后取消），原分拣口：${
+          `目的地请求：条码重复，已移除1008队列中老信息（原分拣口：${
             oldItem.allocatedPortNo || '--'
-          }，条码：${barcode}`,
+          }），已写DBW104=1（2秒后取消），条码：${barcode}`,
           'alarm'
         );
         return;
