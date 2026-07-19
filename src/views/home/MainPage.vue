@@ -3336,7 +3336,7 @@ export default {
         // 第三步：再2秒后取消写入
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
-        }, 2000);
+        }, 5000);
       }, 1000);
     },
     // 全线清空时给PLC发送的命令：所有分拣口先禁止进货2秒，再允许进货2秒，最后取消写入
