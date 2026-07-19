@@ -28,6 +28,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const mqtt = require('mqtt');
+const plcConnLogger = require('./utils/plcConnLogger');
 var appTray = null;
 let closeStatus = false;
 var conn = new nodes7();
@@ -218,6 +219,7 @@ app.on('window-all-closed', () => {
 // 应用退出时确保所有日志都被写入
 app.on('before-quit', () => {
   flushLogBuffer();
+  plcConnLogger.flush();
   if (twinMqttClient) {
     try {
       twinMqttClient.end(true);
@@ -529,6 +531,7 @@ function conPLC() {
         conPLC();
         return false;
       }
+      plcConnLogger.setEndpoint(res.data.plcIp, res.data.plcPort);
       conn.initiateConnection(
         {
           port: Number(res.data.plcPort),
@@ -549,6 +552,7 @@ function conPLC() {
             return variables[tag];
           }); // This sets the "translation" to allow us to work with object names
           logger.info('连接PLC成功');
+          plcConnLogger.startHeartbeatWatch();
           // —— 读取点位（与 读取点位.csv / DB1000、DB1001 一致）——
           conn.addItems('DBW0'); // 输送线看门狗心跳 DB1000.DBW0
           conn.addItems('DBW2'); // 输送线当前运行状态
@@ -782,12 +786,18 @@ function cancelWriteToPLC(add) {
 function valuesWritten(anythingBad) {
   if (anythingBad) {
     console.log('SOMETHING WENT WRONG WRITING VALUES!!!!');
+    plcConnLogger.markWriteFail();
+  } else {
+    plcConnLogger.markWriteOk();
   }
 }
 
 function valuesReady(anythingBad, values) {
   if (anythingBad) {
     console.log('SOMETHING WENT WRONG READING VALUES!!!!');
+    plcConnLogger.markReadFail(values);
+  } else {
+    plcConnLogger.markReadOk(values && values.DBW0, values);
   }
   // console.log(values)
   mainWindow.webContents.send('receivedMsg', values, writeStrArr.toString());
