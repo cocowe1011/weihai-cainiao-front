@@ -595,15 +595,8 @@ function conPLC() {
           conn.addItems('DBW1244'); // 分拣口11计数
           conn.addItems('DBW1246'); // 分拣口12计数
           conn.addItems('DBW1248'); // 分拣口13计数
-          setInterval(() => {
-            conn.readAllItems(valuesReady);
-          }, 200);
-          setInterval(() => {
-            // nodes7 代码
-            conn.writeItems(writeAddArr, writeStrArr, valuesWritten);
-          }, 200);
-          // 发送心跳
-          sendHeartToPLC();
+          // 单连接串行读写，避免 read/write 并发导致整批 BAD 255
+          startPlcIoScheduler();
         }
       );
     })
@@ -612,17 +605,64 @@ function conPLC() {
     });
 }
 
-let times = 1;
-let nowValue = 0;
-function sendHeartToPLC() {
-  setInterval(() => {
-    if (times > 5) {
-      times = 1;
-      nowValue = 1 - nowValue;
+/** PLC IO：同一时刻只允许一次读或一次写 */
+const PLC_IO_CYCLE_MS = 200;
+let plcIoBusy = false;
+let plcIoPhase = 'read'; // 'read' | 'write'
+let plcIoSchedulerStarted = false;
+/** 写周期计数：每 3 次写翻转一次 W_DBW0（写约 400ms/次 → 心跳约 1.2s） */
+let heartWriteCount = 1;
+let heartValue = 0;
+
+function startPlcIoScheduler() {
+  if (plcIoSchedulerStarted) return;
+  plcIoSchedulerStarted = true;
+  setInterval(tickPlcIo, PLC_IO_CYCLE_MS);
+}
+
+/** 写前更新心跳缓冲，随本拍 writeItems 一并下发 */
+function refreshHeartBuffer() {
+  if (heartWriteCount > 2) {
+    heartWriteCount = 1;
+    heartValue = 1 - heartValue;
+  }
+  heartWriteCount++;
+  writeValuesToPLC('W_DBW0', heartValue);
+}
+
+function tickPlcIo() {
+  if (plcIoBusy) return;
+
+  if (plcIoPhase === 'read') {
+    plcIoBusy = true;
+    conn.readAllItems((anythingBad, values) => {
+      try {
+        valuesReady(anythingBad, values);
+      } finally {
+        plcIoBusy = false;
+        plcIoPhase = 'write';
+      }
+    });
+    return;
+  }
+
+  if (!writeAddArr.length) {
+    plcIoPhase = 'read';
+    return;
+  }
+
+  refreshHeartBuffer();
+  plcIoBusy = true;
+  const addrs = writeAddArr.slice();
+  const vals = writeStrArr.slice();
+  conn.writeItems(addrs, vals, (anythingBad) => {
+    try {
+      valuesWritten(anythingBad);
+    } finally {
+      plcIoBusy = false;
+      plcIoPhase = 'read';
     }
-    times++;
-    writeValuesToPLC('W_DBW0', nowValue);
-  }, 200); // 每200毫秒执行一次交替
+  });
 }
 
 var variables = {
