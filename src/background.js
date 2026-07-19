@@ -538,6 +538,8 @@ function conPLC() {
           host: res.data.plcIp,
           rack: 0,
           slot: 1,
+          // 默认 1500ms 易在偶发大包读时整批 BAD 255；3s 覆盖短毛刺且不拖太久
+          timeout: 3000,
           debug: false
         },
         (err) => {
@@ -577,7 +579,6 @@ function conPLC() {
           conn.addItems('DBB598'); // 分拣口11进货ID
           conn.addItems('DBB628'); // 分拣口12进货ID
           conn.addItems('DBB658'); // 分拣口13进货ID
-          conn.addItems('DBB688'); // 备用
           // 各皮带工位虚拟ID（DB1000.DBB748-808）
           conn.addItems('DBB748'); // M1008工位ID
           conn.addItems('DBB808'); // M1010工位ID
@@ -689,7 +690,6 @@ var variables = {
   DBB598: 'DB1000,S598.28', // 分拣口11进货ID
   DBB628: 'DB1000,S628.28', // 分拣口12进货ID
   DBB658: 'DB1000,S658.28', // 分拣口13进货ID
-  DBB688: 'DB1000,S688.28', // 备用
   // —— 各皮带工位虚拟ID（DB1000.DBB748-808，每段 char(30)）——
   DBB748: 'DB1000,S748.28', // M1008工位ID
   DBB808: 'DB1000,S808.28', // M1010工位ID

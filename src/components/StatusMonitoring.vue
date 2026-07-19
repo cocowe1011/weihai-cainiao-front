@@ -382,13 +382,14 @@ export default {
         if (this.warningTimeOut) {
           clearTimeout(this.warningTimeOut);
         }
+        // 与 plcConnLogger 一致：PLC DBW0 翻转常在 3~4s，3s 易误报
         this.warningTimeOut = setTimeout(() => {
           if (this._isDestroyed) return;
           this.plcStatus = false;
           if (this.$route.path != '/login') {
             this.$message.error('PLC连接中断');
           }
-        }, 3000);
+        }, 8000);
       }
     }
   },

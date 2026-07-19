@@ -3,7 +3,8 @@ const fs = require('fs');
 const LOG_DIR = 'D://weihai-cainiao-front/plc-conn-log';
 const BUFFER_SIZE = 20;
 const FLUSH_INTERVAL = 5000;
-const HEARTBEAT_TIMEOUT_MS = 3000;
+// PLC DBW0 翻转常在 3~4s，3s 易误报；放宽到 8s
+const HEARTBEAT_TIMEOUT_MS = 8000;
 const HEARTBEAT_CHECK_INTERVAL_MS = 1000;
 const MAX_FILE_SIZE_MB = 10;
 const BAD_KEYS_LOG_LIMIT = 20;
