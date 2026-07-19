@@ -3319,14 +3319,16 @@ export default {
           console.error('轮询队列AGV状态失败:', err);
         });
     },
-    // 解除PLC某分拣口的禁止进货命令（将该分拣口对应的DBW102位清零）
+    // 解除PLC某分拣口的禁止进货命令（将该分拣口对应的DBW102位清零，保持2秒后取消写入）
     clearPlcForbidPort(queueIndex) {
       const forbidBitAdd = `W_DBW102_BIT${queueIndex - 1}`;
       ipcRenderer.send('writeSingleValueToPLC', forbidBitAdd, false);
-      this.addLog(`已解除分拣口${queueIndex}禁止进货，${forbidBitAdd}=false`);
+      this.addLog(
+        `已解除分拣口${queueIndex}禁止进货，${forbidBitAdd}=false（保持2秒）`
+      );
       setTimeout(() => {
         ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
-      }, 1000);
+      }, 2000);
     },
     // 全线清空时给PLC发送的命令：所有分拣口先禁止进货2秒，再允许进货2秒，最后取消写入
     clearAllSortPortsForLineClear() {
@@ -3355,7 +3357,7 @@ export default {
             ipcRenderer.send('cancelWriteToPLC', add);
           });
           this.addLog('全线清空：已取消所有分拣口PLC写入');
-        }, 1000);
+        }, 2000);
       }, 1000);
     },
     // 分拣口分配算法
