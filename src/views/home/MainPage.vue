@@ -3319,16 +3319,25 @@ export default {
           console.error('轮询队列AGV状态失败:', err);
         });
     },
-    // 解除PLC某分拣口的禁止进货命令（将该分拣口对应的DBW102位清零，保持2秒后取消写入）
+    // 解除PLC某分拣口的禁止进货命令：先发true（1秒），再发false（2秒），最后取消写入
     clearPlcForbidPort(queueIndex) {
       const forbidBitAdd = `W_DBW102_BIT${queueIndex - 1}`;
-      ipcRenderer.send('writeSingleValueToPLC', forbidBitAdd, false);
+      // 第一步：发送 true（禁止进货），持续1秒
+      ipcRenderer.send('writeSingleValueToPLC', forbidBitAdd, true);
       this.addLog(
-        `已解除分拣口${queueIndex}禁止进货，${forbidBitAdd}=false（保持2秒）`
+        `分拣口${queueIndex}解除禁止进货：${forbidBitAdd}=true（保持1秒）`
       );
+      // 第二步：1秒后发送 false（允许进货），持续2秒
       setTimeout(() => {
-        ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
-      }, 2000);
+        ipcRenderer.send('writeSingleValueToPLC', forbidBitAdd, false);
+        this.addLog(
+          `分拣口${queueIndex}解除禁止进货：${forbidBitAdd}=false（保持2秒）`
+        );
+        // 第三步：再2秒后取消写入
+        setTimeout(() => {
+          ipcRenderer.send('cancelWriteToPLC', forbidBitAdd);
+        }, 2000);
+      }, 1000);
     },
     // 全线清空时给PLC发送的命令：所有分拣口先禁止进货2秒，再允许进货2秒，最后取消写入
     clearAllSortPortsForLineClear() {
