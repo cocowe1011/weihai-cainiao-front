@@ -135,7 +135,7 @@
                     { alarm: log.type === 'alarm', unread: log.unread }
                   ]"
                 >
-                  <div class="log-time">{{ formatTime(log.timestamp) }}</div>
+                  <div class="log-time">{{ log.timeStr }}</div>
                   <div class="log-item-content">{{ log.message }}</div>
                 </div>
               </template>
@@ -2931,9 +2931,8 @@ export default {
     handleM1010Change(virtualId) {
       const q1008 = this.queues[0]; // 1008队列
       const q1010 = this.queues.find((q) => q.id === 15); // 1010队列
-      const rejectQueue = this.queues.find((q) => q.id === 16); // 剔除口队列
-      if (!q1010 || !rejectQueue) {
-        this.addLog('M1010处理失败：1010队列或剔除口队列不存在', 'alarm');
+      if (!q1010) {
+        this.addLog('M1010处理失败：1010队列不存在', 'alarm');
         return;
       }
 
@@ -2959,19 +2958,16 @@ export default {
         );
       }
 
-      // 将本包裹前面的包裹（未移动到1010的）移动到剔除口队列
+      // 因1010虚拟ID变化有时监听不到，前面的包裹保留在1008队列中，不做剔除处理
       if (currentIndex > 0) {
-        const precedingItems = q1008.trayInfo.splice(0, currentIndex);
-        precedingItems.forEach((item) => {
-          rejectQueue.trayInfo.push(item);
-        });
         this.addLog(
-          `M1010处理：大包号 ${virtualId} 前面有 ${precedingItems.length} 个包裹未到达M1010，已移动到剔除口队列`
+          `M1010处理：大包号 ${virtualId} 前面有 ${currentIndex} 个包裹未到达M1010，保留在1008队列中`,
+          'alarm'
         );
       }
 
       // 将本包裹从1008队列移除并加入1010队列
-      const [movedItem] = q1008.trayInfo.splice(0, 1);
+      const [movedItem] = q1008.trayInfo.splice(currentIndex, 1);
       q1010.trayInfo.push(movedItem);
 
       this.addLog(
@@ -3024,36 +3020,49 @@ export default {
 
       this.addLog(`分拣口${portNo}虚拟ID变化，进货ID（大包号）：${entryId}`);
 
-      // 2. 在1010队列（id=15）中查找匹配的包裹（条码匹配 + 目的地匹配本分拣口）
+      // 2. 在（因1010虚拟ID变化有时监听不到，包裹可能仍在）：依次从1010队列、1008队列中查找匹配的包裹（条码匹配 + 目的地匹配本分拣口）
       const q1010Index = this.queues.findIndex((q) => q.id === 15);
       const q1010 = this.queues[q1010Index];
-      if (!q1010) {
-        this.addLog(`分拣口${portNo}进货处理失败：1010队列不存在`);
-        return;
+      const matchFn = (item) =>
+        (item.packageNo || '').trim() === entryId &&
+        item.allocatedPortNo === portNo;
+
+      let sourceQueue = null;
+      let sourceQueueIndex = -1;
+      let trayIndex = -1;
+
+      if (q1010) {
+        trayIndex = q1010.trayInfo.findIndex(matchFn);
+        if (trayIndex !== -1) {
+          sourceQueue = q1010;
+          sourceQueueIndex = q1010Index;
+        }
       }
-      const trayIndex = q1010.trayInfo.findIndex(
-        (item) =>
-          (item.packageNo || '').trim() === entryId &&
-          item.allocatedPortNo === portNo
-      );
+      if (trayIndex === -1 && this.queues[0]) {
+        trayIndex = this.queues[0].trayInfo.findIndex(matchFn);
+        if (trayIndex !== -1) {
+          sourceQueue = this.queues[0];
+          sourceQueueIndex = 0;
+        }
+      }
 
       if (trayIndex === -1) {
         this.addLog(
-          `分拣口${portNo}虚拟ID变化，但1010队列未找到大包号 ${entryId} 且目的地为分拣口${portNo} 的包裹，跳过`
+          `分拣口${portNo}虚拟ID变化，但1010、1008队列均未找到大包号 ${entryId} 且目的地为分拣口${portNo} 的包裹，跳过`
         );
         return;
       }
 
-      // 3. 从1010队列移除该包裹
-      const [movedTray] = q1010.trayInfo.splice(trayIndex, 1);
+      // 3. 从源队列（1010或1008）移除该包裹
+      const [movedTray] = sourceQueue.trayInfo.splice(trayIndex, 1);
 
       // 4. 加入对应分拣口队列（queues[portNo]）
       const targetQueueIndex = portNo; // queues[1]=分拣口1, queues[13]=分拣口13
       const targetQueue = this.queues[targetQueueIndex];
       if (!targetQueue) {
         this.addLog(`分拣口${portNo}对应队列不存在，包裹 ${entryId} 无法移入`);
-        // 回滚：将包裹放回1010队列
-        q1010.trayInfo.splice(trayIndex, 0, movedTray);
+        // 回滚：将包裹放回源队列
+        sourceQueue.trayInfo.splice(trayIndex, 0, movedTray);
         return;
       }
 
@@ -3063,7 +3072,7 @@ export default {
 
       // 6. 刷新当前选中队列显示
       if (
-        this.selectedQueueIndex === q1010Index ||
+        this.selectedQueueIndex === sourceQueueIndex ||
         this.selectedQueueIndex === targetQueueIndex
       ) {
         this.$nextTick(() => {
@@ -3072,7 +3081,7 @@ export default {
       }
 
       this.addLog(
-        `大包 ${entryId} 已从1010队列移入${targetQueue.queueName}（当前 ${targetQueue.trayInfo.length} 件）`
+        `大包 ${entryId} 已从${sourceQueue.queueName}移入${targetQueue.queueName}（当前 ${targetQueue.trayInfo.length} 件）`
       );
       this.$message.success(`大包 ${entryId} 已进入${targetQueue.queueName}`);
 
@@ -4095,11 +4104,17 @@ export default {
     },
     // 添加新的日志方法
     addLog(message, type = 'running') {
+      const now = new Date();
       const log = {
         id: this.logId++,
         type,
         message,
-        timestamp: new Date().getTime(),
+        timestamp: now.getTime(),
+        timeStr: now.toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }),
         unread: type === 'alarm'
       };
 
