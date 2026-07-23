@@ -1804,14 +1804,14 @@ export default {
           machineNo: 6,
           direction: 2,
           sizeType: 'exception',
-          maxCapacity: 999
+          maxCapacity: 5
         },
         {
           portNo: 13,
           machineNo: 7,
           direction: 1,
           sizeType: 'exception',
-          maxCapacity: 999
+          maxCapacity: 5
         }
       ],
       showTestPanel: false,
@@ -2326,6 +2326,16 @@ export default {
       if (!this.isDataReady) return;
       if (!newVal || !newVal.trim()) return;
       this.handleM1010Change(newVal.trim());
+    },
+    // 异常口12、PLC计数变化：达到最大容量直接呼叫AGV（不校验队列数量一致）
+    'sortPortPlcCounts.12'(newVal) {
+      if (!this.isDataReady) return;
+      this.onExceptionPortPlcCount(12, newVal);
+    },
+    // 异常口13、PLC计数变化：达到最大容量直接呼叫AGV（不校验队列数量一致）
+    'sortPortPlcCounts.13'(newVal) {
+      if (!this.isDataReady) return;
+      this.onExceptionPortPlcCount(13, newVal);
     }
   },
   mounted() {
@@ -3021,11 +3031,13 @@ export default {
       this.addLog(`分拣口${portNo}虚拟ID变化，进货ID（大包号）：${entryId}`);
 
       // 2. 在（因1010虚拟ID变化有时监听不到，包裹可能仍在）：依次从1010队列、1008队列中查找匹配的包裹（条码匹配 + 目的地匹配本分拣口）
+      // 分拣口12、13仅按大包号匹配，不校验目的地
+      const onlyMatchPackageNo = portNo === 12 || portNo === 13;
       const q1010Index = this.queues.findIndex((q) => q.id === 15);
       const q1010 = this.queues[q1010Index];
       const matchFn = (item) =>
         (item.packageNo || '').trim() === entryId &&
-        item.allocatedPortNo === portNo;
+        (onlyMatchPackageNo || item.allocatedPortNo === portNo);
 
       let sourceQueue = null;
       let sourceQueueIndex = -1;
@@ -3048,7 +3060,9 @@ export default {
 
       if (trayIndex === -1) {
         this.addLog(
-          `分拣口${portNo}虚拟ID变化，但1010、1008队列均未找到大包号 ${entryId} 且目的地为分拣口${portNo} 的包裹，跳过`
+          onlyMatchPackageNo
+            ? `分拣口${portNo}虚拟ID变化，但1010、1008队列均未找到大包号 ${entryId} 的包裹，跳过`
+            : `分拣口${portNo}虚拟ID变化，但1010、1008队列均未找到大包号 ${entryId} 且目的地为分拣口${portNo} 的包裹，跳过`
         );
         return;
       }
@@ -3107,6 +3121,59 @@ export default {
           this.$message.info('已取消呼叫AGV');
         });
     },
+    // 异常口（12、13）PLC计数变化处理：达到最大容量且未锁定时，触发直接呼叫AGV
+    onExceptionPortPlcCount(portNo, plcCount) {
+      const portConfig = this.sortPortConfig.find((p) => p.portNo === portNo);
+      const maxCapacity = portConfig ? portConfig.maxCapacity : 5;
+      const queue = this.queues[portNo];
+      if (!queue || queue.isLock === '1') return;
+      if ((plcCount || 0) < maxCapacity) return;
+      this.handleSortPortFull(portNo);
+    },
+    // 异常口（12、13）自动补齐队列包裹，使队列数量与PLC计数一致
+    autoFillExceptionPortQueue(portNo, plcCount) {
+      const queue = this.queues[portNo];
+      if (!queue) return;
+      const needCount = (plcCount || 0) - queue.trayInfo.length;
+      if (needCount <= 0) return;
+      // 已占用大包号（防止本次自动生成重复）
+      const usedNos = new Set(
+        queue.trayInfo.map((t) => (t.packageNo || '').trim())
+      );
+      // 模拟大包号规则：KRRM + 8位数字（数字取自时间戳后8位，如 KRRM12345678）
+      let seq = 0;
+      const genPackageNo = () => {
+        let no;
+        do {
+          const num = String((Date.now() + seq++) % 100000000).padStart(8, '0');
+          no = `KRRM${num}`;
+        } while (usedNos.has(no));
+        usedNos.add(no);
+        return no;
+      };
+      for (let i = 0; i < needCount; i++) {
+        queue.trayInfo.push({
+          orderInfoId: null,
+          packageNo: genPackageNo(),
+          trayTime: moment().format('YYYY-MM-DD HH:mm:ss'),
+          channel: '',
+          packingWeight: 0,
+          expectedQty: 0,
+          trayStatus: '1',
+          allocatedPortNo: portNo,
+          destinationCode: '',
+          isInQueue: '1'
+        });
+      }
+      this.addLog(
+        `分拣口${portNo}（异常口）队列数量与PLC计数不一致，自动补齐${needCount}个包裹（补齐后${queue.trayInfo.length}件，PLC计数${plcCount}）`
+      );
+      if (this.selectedQueueIndex === portNo) {
+        this.$nextTick(() => {
+          this.showTrays(portNo);
+        });
+      }
+    },
     // 分拣口队列达到最大容量后，对比PLC计数与队列数量，决定呼叫AGV或锁定报警
     async handleSortPortFull(portNo) {
       const queueIndex = portNo; // queues[1]=分拣口1, ..., queues[13]=分拣口13
@@ -3125,6 +3192,25 @@ export default {
       const maxCapacity = portConfig ? portConfig.maxCapacity : 5;
       const queueCount = queue.trayInfo.length;
       const plcCount = this.sortPortPlcCounts[portNo] || 0;
+
+      // 异常口（12、13）：PLC计数达到最大容量即直接呼叫AGV，不校验队列数量一致；数量不足自动补齐包裹
+      const isExceptionPort = portConfig && portConfig.sizeType === 'exception';
+      if (isExceptionPort) {
+        if (plcCount < maxCapacity) {
+          this.addLog(
+            `分拣口${portNo}（异常口）PLC计数${plcCount}未达最大容量${maxCapacity}，暂不呼叫AGV`
+          );
+          return;
+        }
+        if (queueCount < plcCount) {
+          this.autoFillExceptionPortQueue(portNo, plcCount);
+        }
+        this.addLog(
+          `分拣口${portNo}（异常口）PLC计数达到${plcCount}，直接呼叫AGV取货`
+        );
+        await this.doCallAgv(portNo);
+        return;
+      }
 
       this.addLog(
         `分拣口${portNo}队列已满（${queueCount}/${maxCapacity}），PLC计数：${plcCount}，队列数量：${queueCount}`
