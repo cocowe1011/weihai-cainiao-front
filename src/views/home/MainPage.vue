@@ -3264,8 +3264,9 @@ export default {
             materialCategoryCode: 'M1',
             materialDataCode: pkgNo,
             attributeList: [
+              { attributeCode: 'trackingNumber', attributeValue: pkgNo },
               { attributeCode: 'weight', attributeValue: '0' },
-              { attributeCode: 'trackingNumber', attributeValue: pkgNo }
+              { attributeCode: 'channel', attributeValue: tray.channel || '' }
             ]
           };
         });
