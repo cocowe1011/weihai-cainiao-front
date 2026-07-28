@@ -1716,87 +1716,87 @@ export default {
       sixScanProcessing: false,
       // 目的地请求限流时间戳（2秒内重复信号不处理）
       lastDestinationReqTime: 0,
-      // 大包分拣口循环下发游标（满容量后按 1→9 顺序循环开新口）
-      lastLargeAllocPortNo: 0,
+      // 分拣口循环下发游标（满容量后按 1→11 顺序循环开新空口）
+      lastAllocPortNo: 0,
       // 六面扫Socket连接状态
       sixScanSocketConnected: false,
-      // 分拣口配置（1-9大件，10-11小件，12-13异常口）
+      // 分拣口配置（1-11通用口，不区分大小件；12-13异常口）
       sortPortConfig: [
         {
           portNo: 1,
           machineNo: 1,
           direction: 1,
-          sizeType: 'large',
+          sizeType: 'normal',
           maxCapacity: 5
         },
         {
           portNo: 2,
           machineNo: 1,
           direction: 2,
-          sizeType: 'large',
+          sizeType: 'normal',
           maxCapacity: 5
         },
         {
           portNo: 3,
           machineNo: 2,
           direction: 1,
-          sizeType: 'large',
+          sizeType: 'normal',
           maxCapacity: 5
         },
         {
           portNo: 4,
           machineNo: 2,
           direction: 2,
-          sizeType: 'large',
+          sizeType: 'normal',
           maxCapacity: 5
         },
         {
           portNo: 5,
           machineNo: 3,
           direction: 1,
-          sizeType: 'large',
+          sizeType: 'normal',
           maxCapacity: 5
         },
         {
           portNo: 6,
           machineNo: 3,
           direction: 2,
-          sizeType: 'large',
+          sizeType: 'normal',
           maxCapacity: 5
         },
         {
           portNo: 7,
           machineNo: 4,
           direction: 1,
-          sizeType: 'large',
+          sizeType: 'normal',
           maxCapacity: 5
         },
         {
           portNo: 8,
           machineNo: 4,
           direction: 2,
-          sizeType: 'large',
+          sizeType: 'normal',
           maxCapacity: 5
         },
         {
           portNo: 9,
           machineNo: 5,
           direction: 1,
-          sizeType: 'large',
+          sizeType: 'normal',
           maxCapacity: 5
         },
         {
           portNo: 10,
           machineNo: 5,
           direction: 2,
-          sizeType: 'small',
+          sizeType: 'normal',
           maxCapacity: 5
         },
         {
           portNo: 11,
           machineNo: 6,
           direction: 1,
-          sizeType: 'small',
+          sizeType: 'normal',
           maxCapacity: 5
         },
         {
@@ -2816,13 +2816,13 @@ export default {
       this.nowScanTrayInfo = packageInfo;
       const packageSize = packageInfo.packageSize;
       try {
-        // 1. 分配分拣口（大包1~9循环；同一分拣口仅允许同一渠道号）
+        // 1. 分配分拣口（1~11循环；同口仅允许同渠道、同大小包裹）
         const port = this.allocateSortPort(packageSize, packageInfo.channel);
         if (!port) {
           throw new Error(
-            `无法分配分拣口，所有${
-              packageSize === 'large' ? '大件' : '小件'
-            }分拣口已满或无匹配渠道号（${packageInfo.channel || '--'}）的可用口`
+            `无法分配分拣口，所有分拣口已满或无匹配渠道（${
+              packageInfo.channel || '--'
+            }）且同大小的可用口`
           );
         }
 
@@ -2866,7 +2866,7 @@ export default {
         }, 1000);
         this.addLog(
           `分配分拣口${port.portNo}（${
-            port.sizeType === 'large' ? '大件' : '小件'
+            packageSize === 'large' ? '大包' : '小包'
           }），分拣机${port.machineNo}，流水号${sequenceNo}，${
             isLast ? '最后一件' : '普通'
           }，目的地编码：${destinationCode},已写入目的地编码：${destinationCode}，已写入虚拟ID（条码）：${barcode},分拣口当前包裹数量：${portQueueCount}，1008队列包裹数量：${q1008Count}，1010队列包裹数量：${q1010Count}`
@@ -2886,6 +2886,7 @@ export default {
           packageNo: packageInfo.packageNo,
           trayTime: moment().format('YYYY-MM-DD HH:mm:ss'),
           channel: packageInfo.channel,
+          packageSize: packageInfo.packageSize, // 记录包裹大小，用于分拣口同大小约束判断
           packingWeight: packageInfo.packingWeight,
           expectedQty: packageInfo.expectedQty,
           trayStatus: '1',
@@ -3465,19 +3466,19 @@ export default {
         }, 2000);
       }, 1000);
     },
-    // 分拣口分配算法
-    // 大包(1~9)：同渠道未满口优先续放；满后按1→9循环开新空口；一口一渠道
-    // 小包(10~11)：同渠道未满口优先，否则按口号顺序开空口；一口一渠道
+    // 分拣口分配算法（1~11通用口，不区分大小件）
+    // 同渠道且同大小的未满口优先续放；否则按 1→11 顺序循环开新空口
+    // 一口一渠道、一口一大小（大包配大包、小包配小包）
     allocateSortPort(packageSize, channel) {
       const channelKey = (channel || '').trim();
-      // 根据包裹大小过滤可用分拣口（排除异常口）
+      // 候选口：排除异常口（12、13），1~11口均可分配任意大小包裹
       const candidates = this.sortPortConfig.filter(
-        (p) => p.sizeType === packageSize
+        (p) => p.sizeType !== 'exception'
       );
       // 按portNo从小到大排序
       candidates.sort((a, b) => a.portNo - b.portNo);
 
-      // 计算每个分拣口的当前负载与占用渠道
+      // 计算每个分拣口的当前负载、占用渠道与占用大小
       const q1010 = this.queues.find((q) => q.id === 15);
       const portLoads = candidates
         .map((port) => {
@@ -3512,48 +3513,49 @@ export default {
           const occupiedChannel = occupiedItem
             ? (occupiedItem.channel || '').trim()
             : '';
-          return { port, currentLoad, occupiedChannel };
+          // 口内已占用的包裹大小（取第一个带packageSize的包裹）
+          const occupiedSizeItem = assignedItems.find(
+            (item) => item.packageSize
+          );
+          const occupiedSize = occupiedSizeItem
+            ? occupiedSizeItem.packageSize
+            : '';
+          return { port, currentLoad, occupiedChannel, occupiedSize };
         })
         .filter(Boolean);
 
-      // 优先级1：已有同渠道包裹且未满的分拣口（一口一渠道，优先续满）
+      // 优先级1：已有同渠道且同大小包裹且未满的分拣口（优先续满在用口）
       const sameChannelPartial = portLoads.filter(
         (p) =>
           p.currentLoad > 0 &&
           p.currentLoad < p.port.maxCapacity &&
-          p.occupiedChannel === channelKey
+          p.occupiedChannel === channelKey &&
+          p.occupiedSize === packageSize
       );
       if (sameChannelPartial.length > 0) {
         return sameChannelPartial[0].port;
       }
 
-      // 优先级2：空闲分拣口
+      // 优先级2：空闲分拣口，按 1→11 顺序循环开新空口（大小包共用游标）
       const empty = portLoads.filter((p) => p.currentLoad === 0);
       if (empty.length === 0) {
         return null;
       }
-
-      // 大包：容量满后按 1~9 顺序循环开新口
-      if (packageSize === 'large') {
-        const largePortNos = candidates.map((p) => p.portNo);
-        let startIdx = largePortNos.indexOf(this.lastLargeAllocPortNo);
-        if (startIdx < 0) {
-          startIdx = -1;
-        }
-        for (let i = 1; i <= largePortNos.length; i++) {
-          const idx = (startIdx + i) % largePortNos.length;
-          const portNo = largePortNos[idx];
-          const found = empty.find((e) => e.port.portNo === portNo);
-          if (found) {
-            this.lastLargeAllocPortNo = portNo;
-            return found.port;
-          }
-        }
-        return null;
+      const portNos = candidates.map((p) => p.portNo);
+      let startIdx = portNos.indexOf(this.lastAllocPortNo);
+      if (startIdx < 0) {
+        startIdx = -1;
       }
-
-      // 小包：按口号从小到大取空口
-      return empty[0].port;
+      for (let i = 1; i <= portNos.length; i++) {
+        const idx = (startIdx + i) % portNos.length;
+        const portNo = portNos[idx];
+        const found = empty.find((e) => e.port.portNo === portNo);
+        if (found) {
+          this.lastAllocPortNo = portNo;
+          return found.port;
+        }
+      }
+      return null;
     },
     // 手动模拟 DBW16.bit0 上升沿信号（测试用）
     triggerDestinationRequest() {
@@ -3779,7 +3781,7 @@ export default {
             // 全线清空后检查并更新DBW100
             this.checkAndWriteDBW100();
             this.nowScanTrayInfo = {};
-            this.lastLargeAllocPortNo = 0; // 大包循环下发游标重置，下次从分拣口1开始
+            this.lastAllocPortNo = 0; // 分拣口循环下发游标重置，下次从分拣口1开始
             this.runningLogs = []; // 修改为空数组
             this.alarmLogs = []; // 修改为空数组
             this.nowTrays = [];
