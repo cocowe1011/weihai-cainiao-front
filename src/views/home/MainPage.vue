@@ -2776,22 +2776,30 @@ export default {
         return;
       }
 
-      // 4. 单码重复检测：查1008队列中是否已有同 packageNo 的条目
-      const existingIndex = this.queues[0].trayInfo.findIndex(
-        (item) => item.packageNo === barcode
-      );
-      if (existingIndex !== -1) {
-        // 重复包裹：从1008队列删除老条目，写 DBW104=1 保持2秒后取消，不再重新入队
-        const oldItem = this.queues[0].trayInfo.splice(existingIndex, 1)[0];
-        if (this.selectedQueueIndex === 0) {
-          this.showTrays(0);
+      // 4. 单码重复检测：查1008队列和1010队列中是否已有同 packageNo 的条目
+      const dupQ1010 = this.queues.find((q) => q.id === 15);
+      const dupCheckQueues = [
+        { queue: this.queues[0], name: '1008' },
+        { queue: dupQ1010, name: '1010' }
+      ];
+      for (const { queue, name } of dupCheckQueues) {
+        if (!queue) continue;
+        const existingIndex = queue.trayInfo.findIndex(
+          (item) => item.packageNo === barcode
+        );
+        if (existingIndex === -1) continue;
+        // 重复包裹：从所在队列删除老条目，写 DBW104=1 保持2秒后取消，不再重新入队
+        const oldItem = queue.trayInfo.splice(existingIndex, 1)[0];
+        const queueIndex = this.queues.indexOf(queue);
+        if (this.selectedQueueIndex === queueIndex) {
+          this.showTrays(queueIndex);
         }
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW104', 1);
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW104');
         }, 2000);
         this.addLog(
-          `目的地请求：条码重复，已移除1008队列中老信息（原分拣口：${
+          `目的地请求：条码重复，已移除${name}队列中老信息（原分拣口：${
             oldItem.allocatedPortNo || '--'
           }），已写DBW104=1（2秒后取消），条码：${barcode}`,
           'alarm'
