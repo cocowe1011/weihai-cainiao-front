@@ -5,17 +5,16 @@
     @dblclick="openPlcPanel"
   >
     <div class="inner">
-      <i
-        :class="plcStatus ? 'el-icon-circle-check' : 'el-icon-circle-close'"
-        class="status-icon"
-      ></i>
+      <el-icon class="status-icon">
+        <component :is="plcStatus ? 'CircleCheck' : 'CircleClose'" />
+      </el-icon>
       <span class="status-text">
         {{ plcStatus ? 'PLC 已连接' : 'PLC 断开' }}
       </span>
     </div>
     <el-dialog
       title="PLC变量"
-      :visible.sync="plcPanelVisible"
+      v-model="plcPanelVisible"
       width="760px"
       class="plc-panel"
       append-to-body
@@ -115,7 +114,7 @@
           <span class="plc-panel__bit-title">Bit 解析</span>
           <el-select
             v-model="bitParseAddress"
-            size="mini"
+            size="small"
             class="plc-panel__bit-select"
             filterable
             clearable
@@ -161,8 +160,8 @@ export default {
   name: 'StatusMonitor',
   directives: {
     drag: {
-      // 1. 绑定钩子
-      bind: function (el) {
+      // 1. 挂载钩子（Vue 3：bind 改为 mounted）
+      mounted: function (el) {
         const oDiv = el;
 
         // 定义 resize 处理函数（命名它，以便稍后解绑）
@@ -266,8 +265,8 @@ export default {
           document.addEventListener('contextmenu', endDrag);
         };
       },
-      // 2. 解绑钩子 (防止内存泄漏)
-      unbind: function (el) {
+      // 2. 卸载钩子 (防止内存泄漏，Vue 3：unbind 改为 unmounted)
+      unmounted: function (el) {
         if (el._resizeHandler) {
           window.removeEventListener('resize', el._resizeHandler);
           delete el._resizeHandler;
@@ -403,7 +402,7 @@ export default {
     // 不在挂载时获取数据，只有打开面板时才交互
   },
   // 3. 组件销毁清理
-  beforeDestroy() {
+  beforeUnmount() {
     this._isDestroyed = true;
     // 清理 IPC 监听器
     if (this.ipcHandler) {

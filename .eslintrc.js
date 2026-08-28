@@ -3,8 +3,12 @@ module.exports = {
   env: {
     node: true
   },
+  globals: {
+    // vue-cli-plugin-electron-builder 注入的静态资源路径全局变量
+    __static: 'readonly'
+  },
   extends: [
-    'plugin:vue/essential',
+    'plugin:vue/vue3-essential',
     'eslint:recommended',
     'plugin:prettier/recommended'
   ],
@@ -27,5 +31,5 @@ module.exports = {
       }
     ]
   },
-  ignorePatterns: ['src/utils/grwebapp.js']
+  ignorePatterns: ['src/utils/grwebapp.js', 'src/assets/iconfont.js']
 };

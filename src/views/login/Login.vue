@@ -7,20 +7,14 @@
       <div class="login-right-top">
         <div class="login-right-top-left"></div>
         <div class="login-right-top-min" style="z-index: 12" @click="minWindow">
-          <i
-            class="el-icon-minus"
-            style="font-size: 18px; font-weight: 600"
-          ></i>
+          <el-icon style="font-size: 18px; font-weight: 600"><Minus /></el-icon>
         </div>
         <div
           class="login-right-top-close"
           style="z-index: 12"
           @click="closewindow"
         >
-          <i
-            class="el-icon-close"
-            style="font-size: 18px; font-weight: 600"
-          ></i>
+          <el-icon style="font-size: 18px; font-weight: 600"><Close /></el-icon>
         </div>
       </div>
       <div class="login-right-down">
@@ -34,7 +28,7 @@
             class="user-code"
             spellcheck="false"
             v-model="userCode"
-            @keyup.enter.native="login"
+            @keyup.enter="login"
           ></el-input>
           <el-input
             placeholder="请输入密码"
@@ -43,7 +37,7 @@
             v-model="userPassword"
             spellcheck="false"
             show-password
-            @keyup.enter.native="login"
+            @keyup.enter="login"
           ></el-input>
           <p class="tips">忘记密码请联系管理员</p>
           <el-button
@@ -256,20 +250,25 @@ export default {
       }
       .login-form {
         padding: 20px 30px 20px 0px;
-        ::v-deep .user-code {
+        // Element Plus 边框在 .el-input__wrapper 上，间距需写在组件根元素，写在 inner 上会撞高边框
+        .user-code {
+          margin-bottom: 30px;
+        }
+        .user-password {
+          margin-bottom: 2px;
+        }
+        :deep(.user-code) {
           .el-input__inner {
             height: 45px;
-            margin-bottom: 30px;
             font-size: 14px !important;
             color: #000;
           }
         }
-        ::v-deep .user-password {
+        :deep(.user-password) {
           .el-input__inner {
             height: 45px;
             font-size: 14px !important;
             color: #000;
-            margin-bottom: 2px;
           }
         }
         .user-login-button {
@@ -362,7 +361,7 @@ export default {
   .fade-leave-active {
     transition: opacity 1s;
   }
-  .fade-enter,
+  .fade-enter-from,
   .fade-leave-to {
     opacity: 0;
   }

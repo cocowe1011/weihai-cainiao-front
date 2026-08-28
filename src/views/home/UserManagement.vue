@@ -11,7 +11,7 @@
         <div class="header-right">
           <el-button
             @click="loadUserList"
-            icon="el-icon-refresh"
+            icon="Refresh"
             class="refresh-btn"
             :loading="refreshLoading"
           >
@@ -20,7 +20,7 @@
           <el-button
             type="primary"
             @click="showAddUserDialog = true"
-            icon="el-icon-plus"
+            icon="Plus"
             class="add-btn"
           >
             添加操作员
@@ -32,7 +32,7 @@
       <div class="stats-section">
         <div class="stat-card">
           <div class="stat-icon total">
-            <i class="el-icon-user"></i>
+            <el-icon><User /></el-icon>
           </div>
           <div class="stat-content">
             <div class="stat-number">{{ userList.length }}</div>
@@ -41,7 +41,7 @@
         </div>
         <div class="stat-card">
           <div class="stat-icon active">
-            <i class="el-icon-circle-check"></i>
+            <el-icon><CircleCheck /></el-icon>
           </div>
           <div class="stat-content">
             <div class="stat-number">{{ activeUserCount }}</div>
@@ -50,7 +50,7 @@
         </div>
         <div class="stat-card">
           <div class="stat-icon locked">
-            <i class="el-icon-warning"></i>
+            <el-icon><WarningFilled /></el-icon>
           </div>
           <div class="stat-content">
             <div class="stat-number">{{ lockedUserCount }}</div>
@@ -67,7 +67,7 @@
             <el-input
               placeholder="搜索用户名或账号..."
               v-model="searchKeyword"
-              prefix-icon="el-icon-search"
+              prefix-icon="Search"
               size="small"
               clearable
               style="width: 200px"
@@ -85,7 +85,7 @@
             height="100%"
           >
             <el-table-column label="用户信息" width="200">
-              <template slot-scope="scope">
+              <template #default="scope">
                 <div class="user-info">
                   <el-avatar
                     :size="36"
@@ -105,7 +105,7 @@
               width="120"
               align="center"
             >
-              <template slot-scope="scope">
+              <template #default="scope">
                 <el-tag
                   v-if="scope.row.userRole === 'ADMIN'"
                   type="danger"
@@ -126,7 +126,7 @@
               width="100"
               align="center"
             >
-              <template slot-scope="scope">
+              <template #default="scope">
                 <el-tag
                   v-if="scope.row.isLocked === 1"
                   type="danger"
@@ -144,7 +144,7 @@
               width="100"
               align="center"
             >
-              <template slot-scope="scope">
+              <template #default="scope">
                 <span
                   :class="
                     scope.row.loginFailCount > 0
@@ -158,7 +158,7 @@
             </el-table-column>
 
             <el-table-column prop="createTime" label="创建时间" min-width="160">
-              <template slot-scope="scope">
+              <template #default="scope">
                 <span class="create-time">{{
                   formatTime(scope.row.createTime)
                 }}</span>
@@ -167,15 +167,15 @@
 
             <el-table-column
               label="操作"
-              width="200"
+              width="260"
               fixed="right"
               align="center"
             >
-              <template slot-scope="scope">
+              <template #default="scope">
                 <div class="action-buttons">
                   <el-button
                     v-if="scope.row.isLocked === 1"
-                    size="mini"
+                    size="small"
                     type="success"
                     @click="handleUnlock(scope.row)"
                   >
@@ -183,21 +183,21 @@
                   </el-button>
                   <el-button
                     v-else
-                    size="mini"
+                    size="small"
                     type="warning"
                     @click="handleLock(scope.row)"
                   >
                     锁定
                   </el-button>
                   <el-button
-                    size="mini"
+                    size="small"
                     type="primary"
                     @click="handleResetPassword(scope.row)"
                   >
                     重置密码
                   </el-button>
                   <el-button
-                    size="mini"
+                    size="small"
                     type="danger"
                     @click="handleDelete(scope.row)"
                   >
@@ -214,7 +214,7 @@
     <!-- 添加用户对话框 -->
     <el-dialog
       title="添加操作员"
-      :visible.sync="showAddUserDialog"
+      v-model="showAddUserDialog"
       width="450px"
       :close-on-click-modal="false"
       append-to-body
@@ -248,22 +248,24 @@
           />
         </el-form-item>
       </el-form>
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="cancelAddUser">取 消</el-button>
-        <el-button
-          type="primary"
-          @click="handleAddUser"
-          :loading="addUserLoading"
-        >
-          确 定
-        </el-button>
-      </span>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="cancelAddUser">取 消</el-button>
+          <el-button
+            type="primary"
+            @click="handleAddUser"
+            :loading="addUserLoading"
+          >
+            确 定
+          </el-button>
+        </span>
+      </template>
     </el-dialog>
 
     <!-- 重置密码对话框 -->
     <el-dialog
       title="重置密码"
-      :visible.sync="showResetPasswordDialog"
+      v-model="showResetPasswordDialog"
       width="400px"
       :close-on-click-modal="false"
       append-to-body
@@ -299,16 +301,18 @@
           />
         </el-form-item>
       </el-form>
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="cancelResetPassword">取 消</el-button>
-        <el-button
-          type="primary"
-          @click="confirmResetPassword"
-          :loading="resetPasswordLoading"
-        >
-          确 定
-        </el-button>
-      </span>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="cancelResetPassword">取 消</el-button>
+          <el-button
+            type="primary"
+            @click="confirmResetPassword"
+            :loading="resetPasswordLoading"
+          >
+            确 定
+          </el-button>
+        </span>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -722,7 +726,7 @@ export default {
           justify-content: center;
           margin-right: 12px;
 
-          i {
+          .el-icon {
             font-size: 20px;
             color: #fff;
           }
@@ -821,9 +825,11 @@ export default {
           .action-buttons {
             display: flex;
             gap: 5px;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            justify-content: center;
+            white-space: nowrap;
 
-            .el-button--mini {
+            .el-button--small {
               padding: 5px 8px;
               font-size: 12px;
             }
@@ -834,7 +840,7 @@ export default {
   }
 
   // 对话框样式
-  ::v-deep .el-dialog {
+  :deep(.el-dialog) {
     border-radius: 8px;
 
     .el-dialog__header {
@@ -883,8 +889,11 @@ export default {
           font-size: 13px;
         }
 
-        .el-input__inner {
+        .el-input__wrapper {
           border-radius: 4px;
+        }
+
+        .el-input__inner {
           font-size: 13px;
         }
       }
@@ -902,7 +911,7 @@ export default {
   }
 
   // 表格样式优化
-  ::v-deep .el-table {
+  :deep(.el-table) {
     th {
       padding: 12px 0;
     }
@@ -917,7 +926,7 @@ export default {
   }
 
   // 标签样式
-  ::v-deep .el-tag {
+  :deep(.el-tag) {
     border-radius: 4px;
     font-size: 11px;
     padding: 2px 6px;

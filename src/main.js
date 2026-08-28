@@ -1,17 +1,14 @@
-import Vue from 'vue';
+import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
 import store from './store';
-import ElementUI from 'element-ui'; //全局引入element
-import 'element-ui/lib/theme-chalk/index.css'; //全局引入element的样式
+import ElementPlus from 'element-plus'; //全局引入element-plus
+import zhCn from 'element-plus/es/locale/lang/zh-cn'; //中文语言包（Element Plus 默认英文，需显式指定）
+import 'element-plus/dist/index.css'; //全局引入element-plus的样式
+import * as ElementPlusIconsVue from '@element-plus/icons-vue';
 import axios from 'axios';
-import VueCookies from 'vue-cookies';
 import './assets/iconfont.css';
-Vue.use(VueCookies);
 
-Vue.config.productionTip = false;
-Vue.use(ElementUI); //全局注入element
-Vue.prototype.$axios = axios;
 axios.defaults.timeout = 20000;
 
 // 缩放：zoomFactor为数字型才执行缩放（如0.6），非数字型(如"")不缩放
@@ -39,8 +36,12 @@ if (typeof zoomFactor === 'number') {
   });
 }
 
-new Vue({
-  router,
-  store,
-  render: (h) => h(App)
-}).$mount('#app');
+const app = createApp(App);
+// 全局注册element-plus图标组件
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+  app.component(key, component);
+}
+app.use(router);
+app.use(store);
+app.use(ElementPlus, { locale: zhCn });
+app.mount('#app');

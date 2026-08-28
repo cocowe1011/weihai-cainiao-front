@@ -17,23 +17,23 @@
         <div class="title-bar-actions">
           <span class="version-tag">V1.1.0</span>
           <div class="win-btn" @click="minWindow">
-            <i class="el-icon-minus"></i>
+            <el-icon><Minus /></el-icon>
           </div>
           <div class="win-btn" @click="maxWindow">
-            <i
-              :class="
-                windowSize === 'unmax-window'
-                  ? 'el-icon-full-screen'
-                  : 'el-icon-copy-document'
-              "
-            ></i>
+            <el-icon>
+              <component
+                :is="
+                  windowSize === 'unmax-window' ? 'FullScreen' : 'CopyDocument'
+                "
+              />
+            </el-icon>
           </div>
           <div
             class="win-btn win-btn--close"
             @click="closewindow"
             v-if="userRole === 'ADMIN'"
           >
-            <i class="el-icon-close"></i>
+            <el-icon><Close /></el-icon>
           </div>
         </div>
       </header>
@@ -50,7 +50,7 @@
               @click="handleSelect(item.index)"
             >
               <div class="nav-item-icon">
-                <i :class="item.icon"></i>
+                <el-icon><component :is="item.icon" /></el-icon>
               </div>
               <span class="nav-item-label">{{ item.label }}</span>
             </div>
@@ -59,16 +59,15 @@
           <div class="side-nav-footer">
             <el-dropdown trigger="click" placement="top" @command="setCommand">
               <div class="footer-btn" title="设置">
-                <i class="el-icon-setting"></i>
+                <el-icon><Setting /></el-icon>
               </div>
-              <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item
-                  icon="el-icon-full-screen"
-                  command="full_screen"
-                >
-                  全屏/取消全屏&nbsp;&nbsp;Ctrl+F11
-                </el-dropdown-item>
-              </el-dropdown-menu>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item icon="FullScreen" command="full_screen">
+                    全屏/取消全屏&nbsp;&nbsp;Ctrl+F11
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
             </el-dropdown>
             <el-dropdown
               trigger="click"
@@ -81,20 +80,22 @@
                   :size="32"
                 ></el-avatar>
               </div>
-              <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item
-                  icon="el-icon-key"
-                  command="updatePassword"
-                  v-if="userRole !== 'ADMIN'"
-                  >修改密码</el-dropdown-item
-                >
-                <el-dropdown-item
-                  icon="el-icon-upload2"
-                  command="logout"
-                  v-if="userRole === 'ADMIN'"
-                  >退出登录</el-dropdown-item
-                >
-              </el-dropdown-menu>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item
+                    icon="Key"
+                    command="updatePassword"
+                    v-if="userRole !== 'ADMIN'"
+                    >修改密码</el-dropdown-item
+                  >
+                  <el-dropdown-item
+                    icon="Upload"
+                    command="logout"
+                    v-if="userRole === 'ADMIN'"
+                    >退出登录</el-dropdown-item
+                  >
+                </el-dropdown-menu>
+              </template>
             </el-dropdown>
           </div>
         </aside>
@@ -102,16 +103,18 @@
         <!-- 主内容区 -->
         <main class="main-panel">
           <StatusMonitor></StatusMonitor>
-          <keep-alive>
-            <router-view />
-          </keep-alive>
+          <router-view v-slot="{ Component }">
+            <keep-alive>
+              <component :is="Component" />
+            </keep-alive>
+          </router-view>
         </main>
       </div>
     </div>
 
     <el-dialog
       title="修改密码"
-      :visible.sync="dialogFormVisible"
+      v-model="dialogFormVisible"
       append-to-body
       :close-on-click-modal="false"
     >
@@ -129,12 +132,14 @@
           ></el-input>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="cancelUpdatePassword">取 消</el-button>
-        <el-button type="primary" @click="updatePasswordMethod"
-          >确 定</el-button
-        >
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="cancelUpdatePassword">取 消</el-button>
+          <el-button type="primary" @click="updatePasswordMethod"
+            >确 定</el-button
+          >
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -166,15 +171,15 @@ export default {
   computed: {
     navItems() {
       const items = [
-        { index: '1', label: '首页', icon: 'el-icon-s-home' },
-        { index: '2', label: '业务', icon: 'el-icon-s-operation' },
+        { index: '1', label: '首页', icon: 'HomeFilled' },
+        { index: '2', label: '业务', icon: 'Operation' },
         {
           index: '3',
           label: '用户',
-          icon: 'el-icon-user-solid',
+          icon: 'UserFilled',
           isAdminShow: true
         },
-        { index: '5', label: '关于', icon: 'el-icon-info' }
+        { index: '5', label: '关于', icon: 'InfoFilled' }
       ];
       return items.filter(
         (item) => !item.isAdminShow || this.userRole === 'ADMIN'
@@ -319,9 +324,10 @@ export default {
       }
     },
     changeIcon() {
-      ipcRenderer.on('mainWin-max', (e, status) => {
+      this.maxWinHandler = (e, status) => {
         this.windowSize = status;
-      });
+      };
+      ipcRenderer.on('mainWin-max', this.maxWinHandler);
     },
     cancelUpdatePassword() {
       this.dialogFormVisible = false;
@@ -372,7 +378,14 @@ export default {
     // 获取用户角色
     this.userRole = remote.getGlobal('sharedObject').userInfo.userRole || '';
   },
-  mounted() {}
+  mounted() {},
+  beforeUnmount() {
+    // 清理窗口最大化状态监听器，防止重复注册
+    if (this.maxWinHandler) {
+      ipcRenderer.removeListener('mainWin-max', this.maxWinHandler);
+      this.maxWinHandler = null;
+    }
+  }
 };
 </script>
 
@@ -636,17 +649,6 @@ export default {
     height: 100%;
     position: relative;
     overflow: hidden;
-  }
-
-  ::v-deep {
-    .el-drawer__wrapper {
-      height: calc(100% - var(--hp-titlebar-height));
-      top: var(--hp-titlebar-height);
-      bottom: auto;
-    }
-    .v-modal {
-      top: auto;
-    }
   }
 }
 </style>

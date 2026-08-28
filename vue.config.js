@@ -3,6 +3,24 @@ const NodePolyfillPlugin = require('node-polyfill-webpack-plugin');
 const path = require('path');
 module.exports = defineConfig({
   transpileDependencies: true,
+  devServer: {
+    client: {
+      overlay: {
+        // ResizeObserver 循环警告为浏览器良性提示（Element Plus 组件内部大量使用），不弹错误遮罩
+        runtimeErrors: (error) => {
+          if (
+            error.message === 'ResizeObserver loop limit exceeded' ||
+            error.message.includes(
+              'ResizeObserver loop completed with undelivered notifications'
+            )
+          ) {
+            return false;
+          }
+          return true;
+        }
+      }
+    }
+  },
   configureWebpack: {
     resolve: {
       fallback: {

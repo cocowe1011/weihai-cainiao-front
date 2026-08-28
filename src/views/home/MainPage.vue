@@ -53,8 +53,8 @@
             <span>操作</span>
             <el-button
               type="primary"
-              size="mini"
-              icon="el-icon-search"
+              size="small"
+              icon="Search"
               @click="showOrderQueryDialog"
             >
               查询历史订单
@@ -66,14 +66,14 @@
               @click="toggleButtonState('start')"
               :class="{ pressed: buttonStates.start }"
             >
-              <i class="el-icon-switch-button"></i><span>全线启动</span>
+              <el-icon><SwitchButton /></el-icon><span>全线启动</span>
             </button>
             <button
               class="btn-stop"
               @click="toggleButtonState('stop')"
               :class="{ pressed: buttonStates.stop }"
             >
-              <i class="el-icon-error"></i><span>全线停止</span>
+              <el-icon><CircleCloseFilled /></el-icon><span>全线停止</span>
             </button>
             <button
               v-show="false"
@@ -81,20 +81,20 @@
               @click="toggleButtonState('reset')"
               :class="{ pressed: buttonStates.reset }"
             >
-              <i class="el-icon-video-pause"></i><span>全线暂停</span>
+              <el-icon><VideoPause /></el-icon><span>全线暂停</span>
             </button>
             <button @click="toggleButtonState('fault_reset')">
-              <i class="el-icon-refresh"></i><span>故障复位</span>
+              <el-icon><Refresh /></el-icon><span>故障复位</span>
             </button>
             <button @click="toggleButtonState('clear')">
-              <i class="el-icon-delete"></i><span>全线清空</span>
+              <el-icon><Delete /></el-icon><span>全线清空</span>
             </button>
             <button
               class="btn-disable-cainiao"
               @click="toggleDisableCainiao"
               :class="{ pressed: disableCainiao }"
             >
-              <i class="el-icon-close"></i
+              <el-icon><Close /></el-icon
               ><span>{{ disableCainiao ? '启用菜鸟' : '停用菜鸟' }}</span>
             </button>
           </div>
@@ -140,7 +140,7 @@
                 </div>
               </template>
               <div v-else class="empty-state">
-                <i class="el-icon-chat-line-square"></i>
+                <el-icon><ChatLineSquare /></el-icon>
                 <p>
                   {{
                     activeLogType === 'running'
@@ -221,7 +221,7 @@
                     class="queue-marker-lock-overlay"
                     @click.stop="handleUnlockQueue(marker.queueId)"
                   >
-                    <i class="el-icon-lock"></i>
+                    <el-icon><Lock /></el-icon>
                   </div>
                   <div
                     v-if="
@@ -230,7 +230,7 @@
                     "
                     class="queue-marker-fail-overlay"
                   >
-                    <i class="el-icon-info"></i>
+                    <el-icon><InfoFilled /></el-icon>
                   </div>
                 </div>
                 <!-- DBW12 光电信号--1 -->
@@ -1092,7 +1092,7 @@
                                   title="发送呼叫"
                                   @click="callAgv(port)"
                                 >
-                                  <i class="el-icon-s-promotion"></i>
+                                  <el-icon><Promotion /></el-icon>
                                 </button>
                               </div>
                             </div>
@@ -1120,7 +1120,7 @@
                                   title="发送呼叫"
                                   @click="callAgv(port)"
                                 >
-                                  <i class="el-icon-s-promotion"></i>
+                                  <el-icon><Promotion /></el-icon>
                                 </button>
                               </div>
                             </div>
@@ -1148,7 +1148,7 @@
                                   title="发送呼叫"
                                   @click="callAgv(port)"
                                 >
-                                  <i class="el-icon-s-promotion"></i>
+                                  <el-icon><Promotion /></el-icon>
                                 </button>
                               </div>
                             </div>
@@ -1176,7 +1176,7 @@
                                   title="发送呼叫"
                                   @click="callAgv(port)"
                                 >
-                                  <i class="el-icon-s-promotion"></i>
+                                  <el-icon><Promotion /></el-icon>
                                 </button>
                               </div>
                             </div>
@@ -1206,7 +1206,9 @@
         <div class="section-header">
           <template v-if="isQueueExpanded">
             <div class="header-left">
-              <span><i class="el-icon-s-data"></i> 队列信息</span>
+              <span
+                ><el-icon><Histogram /></el-icon> 队列信息</span
+              >
             </div>
             <span
               class="arrow-icon"
@@ -1216,7 +1218,7 @@
             >
           </template>
           <template v-else>
-            <i class="el-icon-s-data" @click="changeQueueExpanded"></i>
+            <el-icon @click="changeQueueExpanded"><Histogram /></el-icon>
           </template>
         </div>
         <div v-if="isQueueExpanded" class="expandable-content-queue">
@@ -1239,28 +1241,28 @@
                 <!-- AGV状态标签 -->
                 <el-tag
                   v-if="queue.trayStatus === '0'"
-                  size="mini"
+                  size="small"
                   type="warning"
                   style="margin-left: 4px"
                   >等待AGV取货</el-tag
                 >
                 <el-tag
                   v-else-if="queue.trayStatus === '1'"
-                  size="mini"
+                  size="small"
                   type="info"
                   style="margin-left: 4px"
                   >AGV取货完成</el-tag
                 >
                 <el-tag
                   v-else-if="queue.trayStatus === '2'"
-                  size="mini"
+                  size="small"
                   type="success"
                   style="margin-left: 4px"
                   >空托已返回</el-tag
                 >
                 <el-tag
                   v-else-if="queue.trayStatus === '3'"
-                  size="mini"
+                  size="small"
                   type="danger"
                   style="margin-left: 4px"
                   >AGV调用失败</el-tag
@@ -1325,8 +1327,8 @@
                     <div class="tray-actions">
                       <el-button
                         type="primary"
-                        size="mini"
-                        icon="el-icon-arrow-up"
+                        size="small"
+                        icon="ArrowUp"
                         circle
                         :disabled="index === 0"
                         @click.stop="moveTrayUp(index)"
@@ -1334,8 +1336,8 @@
                       ></el-button>
                       <el-button
                         type="primary"
-                        size="mini"
-                        icon="el-icon-arrow-down"
+                        size="small"
+                        icon="ArrowDown"
                         circle
                         :disabled="index === nowTrays.length - 1"
                         @click.stop="moveTrayDown(index)"
@@ -1343,8 +1345,8 @@
                       ></el-button>
                       <el-button
                         type="danger"
-                        size="mini"
-                        icon="el-icon-delete"
+                        size="small"
+                        icon="Delete"
                         circle
                         @click.stop="deleteTray(tray, index)"
                       ></el-button>
@@ -1352,7 +1354,7 @@
                   </div>
                 </template>
                 <div v-else class="empty-state">
-                  <i class="el-icon-box"></i>
+                  <el-icon><Box /></el-icon>
                   <p>暂无托盘信息</p>
                 </div>
               </div>
@@ -1366,13 +1368,13 @@
     <div class="test-panel-container">
       <!-- 测试按钮 -->
       <div class="test-toggle-btn" @click="showTestPanel = !showTestPanel">
-        <i class="el-icon-setting"></i>
+        <el-icon><Setting /></el-icon>
       </div>
       <!-- 测试面板 -->
       <div class="test-panel" :class="{ collapsed: !showTestPanel }">
         <div class="test-panel-header">
           <span>测试面板</span>
-          <i class="el-icon-close" @click.stop="showTestPanel = false"></i>
+          <el-icon @click.stop="showTestPanel = false"><Close /></el-icon>
         </div>
         <div class="test-panel-content">
           <!-- 添加扫码测试部分 -->
@@ -1678,7 +1680,7 @@
     </div>
 
     <!-- 订单查询对话框 -->
-    <OrderQueryDialog :visible.sync="orderQueryDialogVisible" />
+    <OrderQueryDialog v-model:visible="orderQueryDialogVisible" />
   </div>
 </template>
 
@@ -2360,7 +2362,8 @@ export default {
     this.startMcsPolling();
     // 六面扫TCP直连（不再通过background.js中转）
     this.connectSixScan();
-    ipcRenderer.on('receivedMsg', (event, values, values2) => {
+    // 保存监听器引用，以便组件销毁时移除，避免重复注册和内存泄漏
+    this.receivedMsgHandler = (event, values, values2) => {
       const getBit = (word, bitIndex) => ((word >> bitIndex) & 1).toString();
 
       // 基础状态
@@ -2535,7 +2538,8 @@ export default {
       this.sortPortPlcCounts[11] = Number(values.DBW1244 ?? 0);
       this.sortPortPlcCounts[12] = Number(values.DBW1246 ?? 0);
       this.sortPortPlcCounts[13] = Number(values.DBW1248 ?? 0);
-    });
+    };
+    ipcRenderer.on('receivedMsg', this.receivedMsgHandler);
     // 给PLC数据加载时间
     setTimeout(() => {
       this.addLog('isDataReady数据加载完成');
@@ -4338,8 +4342,13 @@ export default {
       });
     }
   },
-  beforeDestroy() {
+  beforeUnmount() {
     window.removeEventListener('resize', this.updateMarkerPositions);
+    // 清理PLC数据接收监听器，防止重复注册和内存泄漏
+    if (this.receivedMsgHandler) {
+      ipcRenderer.removeListener('receivedMsg', this.receivedMsgHandler);
+      this.receivedMsgHandler = null;
+    }
     // 取消队列监听器
     if (this._queueWatchers && this._queueWatchers.length > 0) {
       this._queueWatchers.forEach((unwatch) => {
@@ -4682,7 +4691,7 @@ export default {
               justify-content: center;
               padding: 40px 0;
               color: var(--mp-text-secondary);
-              i {
+              .el-icon {
                 font-size: 48px;
                 margin-bottom: 16px;
                 color: #c0c4cc;
@@ -4694,7 +4703,7 @@ export default {
               .el-button {
                 color: #4385ff;
                 font-size: 14px;
-                i {
+                .el-icon {
                   font-size: 14px;
                   margin-right: 4px;
                   color: inherit;
@@ -4749,7 +4758,7 @@ export default {
             text-align: center;
             padding: 8px;
             gap: 5px;
-            i {
+            .el-icon {
               font-size: 1.8em;
             }
             span {
@@ -5440,16 +5449,28 @@ export default {
               }
               .preheating-room-marker :deep(.el-select) {
                 width: 100%;
+                --el-fill-color-blank: rgba(255, 255, 255, 0.15);
+                --el-border-color: rgba(255, 255, 255, 0.2);
+                --el-border-color-hover: rgba(255, 255, 255, 0.45);
+                --el-text-color-regular: #fff;
+                --el-text-color-placeholder: rgba(255, 255, 255, 0.5);
               }
-              .preheating-room-marker :deep(.el-input__inner) {
+              .preheating-room-marker :deep(.el-select__wrapper),
+              .preheating-room-marker :deep(.el-input__wrapper) {
                 background-color: rgba(255, 255, 255, 0.15);
-                border-color: rgba(255, 255, 255, 0.2);
-                color: #fff;
+                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+                min-height: 24px;
                 height: 24px;
-                line-height: 24px;
-                font-size: 11px;
-                border-radius: 3px;
                 padding: 0 8px;
+                border-radius: 3px;
+              }
+              .preheating-room-marker :deep(.el-select__selected-item),
+              .preheating-room-marker :deep(.el-input__inner),
+              .preheating-room-marker :deep(.el-select__placeholder) {
+                color: #fff;
+                font-size: 11px;
+                line-height: 24px;
+                height: 24px;
               }
 
               /* 解析状态标签样式 */
@@ -5497,7 +5518,7 @@ export default {
             );
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
             letter-spacing: 0.5px;
-            i {
+            .el-icon {
               margin-right: 6px;
             }
           }
@@ -5961,7 +5982,7 @@ export default {
                 justify-content: center;
                 padding: 40px 0;
                 color: rgba(255, 255, 255, 0.6);
-                i {
+                .el-icon {
                   font-size: 48px;
                   margin-bottom: 16px;
                   color: rgba(255, 255, 255, 0.3);
@@ -5973,7 +5994,7 @@ export default {
                 .el-button {
                   color: #7eb8ff;
                   font-size: 14px;
-                  i {
+                  .el-icon {
                     font-size: 14px;
                     margin-right: 4px;
                     color: inherit;
@@ -6020,7 +6041,7 @@ export default {
         span {
           display: none;
         }
-        i {
+        .el-icon {
           color: #fff;
           font-size: 20px;
           animation: rotate 10s linear infinite;
@@ -6069,7 +6090,7 @@ export default {
   background: #3e7bfa;
 }
 
-.test-toggle-btn i {
+.test-toggle-btn .el-icon {
   color: #fff;
   font-size: 20px;
   animation: rotate 10s linear infinite;
@@ -6147,12 +6168,12 @@ export default {
   background: rgba(64, 158, 255, 0.45);
 }
 
-.test-panel-header i {
+.test-panel-header .el-icon {
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.test-panel-header i:hover {
+.test-panel-header .el-icon:hover {
   color: #ff4d4f;
 }
 
@@ -6330,26 +6351,41 @@ export default {
 
 .qrcode-input {
   flex: 1;
+  // Element Plus：背景/边框在 wrapper，文字色在 inner；旧写法只改 inner 会导致白字打在浅色底上看不见
+  --el-input-bg-color: rgba(255, 255, 255, 0.1);
+  --el-input-text-color: #fff;
+  --el-input-border-color: rgba(64, 158, 255, 0.25);
+  --el-input-hover-border-color: #409eff;
+  --el-input-focus-border-color: #409eff;
+  --el-input-placeholder-color: rgba(255, 255, 255, 0.4);
+}
+
+.qrcode-input :deep(.el-input__wrapper) {
+  background-color: var(--el-input-bg-color);
+  box-shadow: 0 0 0 1px var(--el-input-border-color) inset;
+  padding: 0 6px;
+  min-height: 24px;
+  height: 24px;
+}
+
+.qrcode-input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px var(--el-input-hover-border-color) inset;
+}
+
+.qrcode-input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px var(--el-input-focus-border-color) inset;
 }
 
 .qrcode-input :deep(.el-input__inner) {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(64, 158, 255, 0.25);
-  color: #fff;
+  color: var(--el-input-text-color);
   height: 24px;
   line-height: 24px;
-  padding: 0 6px;
   font-size: 11px;
 }
 
 .qrcode-input :deep(.el-input__inner::placeholder) {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.qrcode-input :deep(.el-input__inner:hover),
-.qrcode-input :deep(.el-input__inner:focus) {
-  border-color: #409eff;
+  color: var(--el-input-placeholder-color);
 }
 
 .qrcode-actions {
@@ -6424,16 +6460,29 @@ export default {
   text-align: right;
 }
 
-.plc-test-wrapper :deep(.el-input--mini .el-input__inner) {
-  height: 24px;
-  line-height: 24px;
-  padding: 0 5px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(64, 158, 255, 0.25);
-  color: #fff;
+.plc-test-wrapper :deep(.el-input) {
+  --el-input-bg-color: rgba(255, 255, 255, 0.1);
+  --el-input-text-color: #fff;
+  --el-input-border-color: rgba(64, 158, 255, 0.25);
+  --el-input-hover-border-color: #409eff;
+  --el-input-focus-border-color: #409eff;
 }
 
-.plc-test-wrapper :deep(.el-button--mini) {
+.plc-test-wrapper :deep(.el-input__wrapper) {
+  background-color: var(--el-input-bg-color);
+  box-shadow: 0 0 0 1px var(--el-input-border-color) inset;
+  padding: 0 5px;
+  min-height: 24px;
+  height: 24px;
+}
+
+.plc-test-wrapper :deep(.el-input__inner) {
+  height: 24px;
+  line-height: 24px;
+  color: var(--el-input-text-color);
+}
+
+.plc-test-wrapper :deep(.el-button--small) {
   padding: 4px 8px;
   min-width: 32px;
 }
@@ -6620,7 +6669,7 @@ export default {
       border-radius: 8px;
       border: 1px solid rgba(255, 193, 7, 0.3);
 
-      i {
+      .el-icon {
         font-size: 48px;
         color: #ffc107;
         margin-bottom: 15px;
