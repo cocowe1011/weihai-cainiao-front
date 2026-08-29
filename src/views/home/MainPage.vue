@@ -1722,98 +1722,89 @@ export default {
       lastAllocPortNo: 0,
       // 六面扫Socket连接状态
       sixScanSocketConnected: false,
+      // 分拣口容量统一配置（通用口共用：大包容量/小包容量；异常口固定容量不区分大小件）
+      largePortCapacity: 5,
+      smallPortCapacity: 8,
+      exceptionPortCapacity: 5,
       // 分拣口配置（1-11通用口，不区分大小件；12-13异常口）
       sortPortConfig: [
         {
           portNo: 1,
           machineNo: 1,
           direction: 1,
-          sizeType: 'normal',
-          maxCapacity: 5
+          sizeType: 'normal'
         },
         {
           portNo: 2,
           machineNo: 1,
           direction: 2,
-          sizeType: 'normal',
-          maxCapacity: 5
+          sizeType: 'normal'
         },
         {
           portNo: 3,
           machineNo: 2,
           direction: 1,
-          sizeType: 'normal',
-          maxCapacity: 5
+          sizeType: 'normal'
         },
         {
           portNo: 4,
           machineNo: 2,
           direction: 2,
-          sizeType: 'normal',
-          maxCapacity: 5
+          sizeType: 'normal'
         },
         {
           portNo: 5,
           machineNo: 3,
           direction: 1,
-          sizeType: 'normal',
-          maxCapacity: 5
+          sizeType: 'normal'
         },
         {
           portNo: 6,
           machineNo: 3,
           direction: 2,
-          sizeType: 'normal',
-          maxCapacity: 5
+          sizeType: 'normal'
         },
         {
           portNo: 7,
           machineNo: 4,
           direction: 1,
-          sizeType: 'normal',
-          maxCapacity: 5
+          sizeType: 'normal'
         },
         {
           portNo: 8,
           machineNo: 4,
           direction: 2,
-          sizeType: 'normal',
-          maxCapacity: 5
+          sizeType: 'normal'
         },
         {
           portNo: 9,
           machineNo: 5,
           direction: 1,
-          sizeType: 'normal',
-          maxCapacity: 5
+          sizeType: 'normal'
         },
         {
           portNo: 10,
           machineNo: 5,
           direction: 2,
-          sizeType: 'normal',
-          maxCapacity: 5
+          sizeType: 'normal'
         },
         {
           portNo: 11,
           machineNo: 6,
           direction: 1,
-          sizeType: 'normal',
-          maxCapacity: 5
+          sizeType: 'normal'
         },
         {
           portNo: 12,
           machineNo: 6,
           direction: 2,
-          sizeType: 'exception',
-          maxCapacity: 5
+          sizeType: 'exception'
         },
         {
           portNo: 13,
           machineNo: 7,
           direction: 1,
-          sizeType: 'exception',
-          maxCapacity: 5
+          sizeType: 'exception'
         }
       ],
       showTestPanel: false,
@@ -2854,8 +2845,8 @@ export default {
         const currentLoad = portQueueCount + q1008Count + q1010Count;
         const sequenceNo = currentLoad + 1;
 
-        // 3. 判断是否最后一件
-        const isLast = currentLoad + 1 >= port.maxCapacity;
+        // 3. 判断是否最后一件（容量按包裹大小区分：大包/小包）
+        const isLast = currentLoad + 1 >= this.getPortCapacity(packageSize);
 
         // 4. 构建目的地编码
         const destinationCode = this.buildDestinationCode(
@@ -3113,8 +3104,14 @@ export default {
       this.$message.success(`大包 ${entryId} 已进入${targetQueue.queueName}`);
 
       // 分拣口队列达到最大容量时，触发满容量判断（对比PLC计数与队列数量）
+      // 异常口固定容量不区分大小件；通用口按口内包裹大小取统一配置（大包/小包容量不同）
       const portConfig = this.sortPortConfig.find((p) => p.portNo === portNo);
-      const maxCapacity = portConfig ? portConfig.maxCapacity : 5;
+      const isExceptionPort = portConfig && portConfig.sizeType === 'exception';
+      const maxCapacity = isExceptionPort
+        ? this.exceptionPortCapacity
+        : this.getPortCapacity(
+            this.getQueuePackageSize(targetQueue) || movedTray.packageSize
+          );
       if (targetQueue.trayInfo.length >= maxCapacity) {
         this.handleSortPortFull(portNo);
       }
@@ -3136,10 +3133,10 @@ export default {
     },
     // 异常口（12、13）PLC计数变化处理：达到最大容量且未锁定时，触发直接呼叫AGV
     onExceptionPortPlcCount(portNo, plcCount) {
-      const portConfig = this.sortPortConfig.find((p) => p.portNo === portNo);
-      const maxCapacity = portConfig ? portConfig.maxCapacity : 5;
       const queue = this.queues[portNo];
       if (!queue || queue.isLock === '1') return;
+      // 异常口固定容量，不区分大小件
+      const maxCapacity = this.exceptionPortCapacity;
       if ((plcCount || 0) < maxCapacity) return;
       this.handleSortPortFull(portNo);
     },
@@ -3202,12 +3199,15 @@ export default {
       }
 
       const portConfig = this.sortPortConfig.find((p) => p.portNo === portNo);
-      const maxCapacity = portConfig ? portConfig.maxCapacity : 5;
+      // 异常口（12、13）固定容量不区分大小件；通用口按口内包裹大小取统一配置（大包/小包容量不同）
+      const isExceptionPort = portConfig && portConfig.sizeType === 'exception';
+      const maxCapacity = isExceptionPort
+        ? this.exceptionPortCapacity
+        : this.getPortCapacity(this.getQueuePackageSize(queue));
       const queueCount = queue.trayInfo.length;
       const plcCount = this.sortPortPlcCounts[portNo] || 0;
 
       // 异常口（12、13）：PLC计数达到最大容量即直接呼叫AGV，不校验队列数量一致；数量不足自动补齐包裹
-      const isExceptionPort = portConfig && portConfig.sizeType === 'exception';
       if (isExceptionPort) {
         if (plcCount < maxCapacity) {
           this.addLog(
@@ -3352,7 +3352,12 @@ export default {
       const allPortsFull = this.sortPortConfig.every((port) => {
         const queue = this.queues[port.portNo];
         if (!queue) return false;
-        return queue.trayInfo.length >= port.maxCapacity;
+        // 异常口固定容量不区分大小件；通用口按口内包裹大小取容量
+        const capacity =
+          port.sizeType === 'exception'
+            ? this.exceptionPortCapacity
+            : this.getPortCapacity(this.getQueuePackageSize(queue));
+        return queue.trayInfo.length >= capacity;
       });
 
       // 检查所有分拣口队列的状态是否都是AGV运输状态
@@ -3478,6 +3483,18 @@ export default {
         }, 2000);
       }, 1000);
     },
+    // 根据包裹大小获取分拣口容量（所有口统一：大包取largePortCapacity，小包取smallPortCapacity）
+    getPortCapacity(packageSize) {
+      return packageSize === 'small'
+        ? this.smallPortCapacity
+        : this.largePortCapacity;
+    },
+    // 获取队列中已占用的包裹大小（一口一大小，取第一个带packageSize的包裹）
+    getQueuePackageSize(queue) {
+      const items = (queue && queue.trayInfo) || [];
+      const item = items.find((t) => t.packageSize);
+      return item ? item.packageSize : '';
+    },
     // 分拣口分配算法（1~11通用口，不区分大小件）
     // 同渠道且同大小的未满口优先续放；否则按 1→11 顺序循环开新空口
     // 一口一渠道、一口一大小（大包配大包、小包配小包）
@@ -3537,10 +3554,11 @@ export default {
         .filter(Boolean);
 
       // 优先级1：已有同渠道且同大小包裹且未满的分拣口（优先续满在用口）
+      // 容量按当前包裹大小取对应配置（大包/小包容量不同）
       const sameChannelPartial = portLoads.filter(
         (p) =>
           p.currentLoad > 0 &&
-          p.currentLoad < p.port.maxCapacity &&
+          p.currentLoad < this.getPortCapacity(packageSize) &&
           p.occupiedChannel === channelKey &&
           p.occupiedSize === packageSize
       );
