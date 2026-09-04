@@ -2783,20 +2783,13 @@ export default {
           (item) => item.packageNo === barcode
         );
         if (existingIndex === -1) continue;
-        // 重复包裹：从所在队列删除老条目，写 DBW104=1 保持2秒后取消，不再重新入队
-        const oldItem = queue.trayInfo.splice(existingIndex, 1)[0];
-        const queueIndex = this.queues.indexOf(queue);
-        if (this.selectedQueueIndex === queueIndex) {
-          this.showTrays(queueIndex);
-        }
-        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW104', 1);
+        // 重复包裹：直接写目的地999，1秒后取消，不再重新入队
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
         setTimeout(() => {
-          ipcRenderer.send('cancelWriteToPLC', 'W_DBW104');
-        }, 2000);
+          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+        }, 1000);
         this.addLog(
-          `目的地请求：条码重复，已移除${name}队列中老信息（原分拣口：${
-            oldItem.allocatedPortNo || '--'
-          }），已写DBW104=1（2秒后取消），条码：${barcode}`,
+          `目的地请求：条码重复（${name}队列已存在同条码），已写目的地999（1秒后取消），条码：${barcode}`,
           'alarm'
         );
         return;
