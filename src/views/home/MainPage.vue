@@ -2453,12 +2453,15 @@ export default {
       const packageSize = packageInfo.packageSize;
       try {
         // 1. 分配分拣口（1~11循环；同口仅允许同渠道、同大小包裹）
-        const port = this.allocateSortPort(packageSize, packageInfo.channel);
+        // 分配失败：仍进上货队列，改发12号异常口
+        let port = this.allocateSortPort(packageSize, packageInfo.channel);
         if (!port) {
-          throw new Error(
-            `无法分配分拣口，所有分拣口已满或无匹配渠道（${
-              packageInfo.channel || '--'
-            }）且同大小的可用口`
+          port = { portNo: 12, machineNo: 6, direction: 1 };
+          this.addLog(
+            `无法分配分拣口（渠道 ${packageInfo.channel || '--'}，${
+              packageSize === 'large' ? '大包' : '小包'
+            }），改发12号异常口`,
+            'alarm'
           );
         }
 
