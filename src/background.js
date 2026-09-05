@@ -565,24 +565,7 @@ function conPLC() {
           conn.addItems('DBW12'); // 光电信号--1
           conn.addItems('DBW14'); // 光电信号--2
           conn.addItems('DBW16'); // 对接WCS信号
-          // 反馈WCS写虚拟ID（DB1000.DBB298-717，每段 char(30)）
-          conn.addItems('DBB298'); // 分拣口01进货ID
-          conn.addItems('DBB328'); // 分拣口02进货ID
-          conn.addItems('DBB358'); // 分拣口03进货ID
-          conn.addItems('DBB388'); // 分拣口04进货ID
-          conn.addItems('DBB418'); // 分拣口05进货ID
-          conn.addItems('DBB448'); // 分拣口06进货ID
-          conn.addItems('DBB478'); // 分拣口07进货ID
-          conn.addItems('DBB508'); // 分拣口08进货ID
-          conn.addItems('DBB538'); // 分拣口09进货ID
-          conn.addItems('DBB568'); // 分拣口10进货ID
-          conn.addItems('DBB598'); // 分拣口11进货ID
-          conn.addItems('DBB628'); // 分拣口12进货ID
-          conn.addItems('DBB658'); // 分拣口13进货ID
-          // 各皮带工位虚拟ID（DB1000.DBB748-808）
-          conn.addItems('DBB748'); // M1008工位ID
-          conn.addItems('DBB808'); // M1010工位ID
-          // 分拣口计数（DB1000.DBW1224-1248，每段INT）
+          // 分拣口计数（DB1000.DBW1224-1246，每段INT）
           conn.addItems('DBW1224'); // 分拣口1计数
           conn.addItems('DBW1226'); // 分拣口2计数
           conn.addItems('DBW1228'); // 分拣口3计数
@@ -595,7 +578,6 @@ function conPLC() {
           conn.addItems('DBW1242'); // 分拣口10计数
           conn.addItems('DBW1244'); // 分拣口11计数
           conn.addItems('DBW1246'); // 分拣口12计数
-          conn.addItems('DBW1248'); // 分拣口13计数
           // 单连接串行读写，避免 read/write 并发导致整批 BAD 255
           startPlcIoScheduler();
         }
@@ -677,23 +659,7 @@ var variables = {
   DBW12: 'DB1000,INT12', // 光电信号--1
   DBW14: 'DB1000,INT14', // 光电信号--2
   DBW16: 'DB1000,INT16', // 对接WCS信号
-  DBB298: 'DB1000,S298.28', // 分拣口01进货ID
-  DBB328: 'DB1000,S328.28', // 分拣口02进货ID
-  DBB358: 'DB1000,S358.28', // 分拣口03进货ID
-  DBB388: 'DB1000,S388.28', // 分拣口04进货ID
-  DBB418: 'DB1000,S418.28', // 分拣口05进货ID
-  DBB448: 'DB1000,S448.28', // 分拣口06进货ID
-  DBB478: 'DB1000,S478.28', // 分拣口07进货ID
-  DBB508: 'DB1000,S508.28', // 分拣口08进货ID
-  DBB538: 'DB1000,S538.28', // 分拣口09进货ID
-  DBB568: 'DB1000,S568.28', // 分拣口10进货ID
-  DBB598: 'DB1000,S598.28', // 分拣口11进货ID
-  DBB628: 'DB1000,S628.28', // 分拣口12进货ID
-  DBB658: 'DB1000,S658.28', // 分拣口13进货ID
-  // —— 各皮带工位虚拟ID（DB1000.DBB748-808，每段 char(30)）——
-  DBB748: 'DB1000,S748.28', // M1008工位ID
-  DBB808: 'DB1000,S808.28', // M1010工位ID
-  // —— 分拣口计数（DB1000.DBW1224-1248，每段INT）——
+  // —— 分拣口计数（DB1000.DBW1224-1246，每段INT）——
   DBW1224: 'DB1000,INT1224', // 分拣口1计数
   DBW1226: 'DB1000,INT1226', // 分拣口2计数
   DBW1228: 'DB1000,INT1228', // 分拣口3计数
@@ -706,17 +672,14 @@ var variables = {
   DBW1242: 'DB1000,INT1242', // 分拣口10计数
   DBW1244: 'DB1000,INT1244', // 分拣口11计数
   DBW1246: 'DB1000,INT1246', // 分拣口12计数
-  DBW1248: 'DB1000,INT1248', // 分拣口13计数
   // —— 写入（写入点位.csv / DB1001）——
   W_DBW0: 'DB1001,INT0', // WCS看门狗心跳
   W_DBW2: 'DB1001,INT2', // WCS-全线启动（系统在线）
   W_DBW4: 'DB1001,INT4', // WCS-全线停止
   W_DBW6: 'DB1001,INT6', // WCS-故障复位
   W_DBW8: 'DB1001,INT8', // WCS六面扫位写目的地
-  W_DBB10: 'DB1001,S10.28', // WCS写虚拟ID
   W_DBW50: 'DB1001,INT50', // WCS修改电机编号
   W_DBW52: 'DB1001,INT52', // WCS修改目的地
-  W_DBB54: 'DB1001,S54.28', // WCS下修改模拟ID
   W_DBW100: 'DB1001,INT100', // WCS系统全部占用信号（1=全满或全AGV运输，0=有空闲）
   W_DBW102_BIT0: 'DB1001,X103.0', // 分拣口01禁止进货
   W_DBW102_BIT1: 'DB1001,X103.1', // 分拣口02禁止进货
@@ -734,7 +697,14 @@ var variables = {
   W_DBW102_BIT13: 'DB1001,X102.5', // 分拣口14禁止进货
   W_DBW102_BIT14: 'DB1001,X102.6', // 分拣口15禁止进货
   W_DBW102_BIT15: 'DB1001,X102.7', // 备用
-  W_DBW104: 'DB1001,INT104' // WCS重复扫码报警（写1保持2秒后取消）
+  W_DBW104: 'DB1001,INT104', // WCS重复扫码报警（写1保持2秒后取消）
+  // —— 分拣机转向命令（发1左转/2右转，写1秒后取消）——
+  W_DBW106: 'DB1001,INT106', // 分拣机1转向命令
+  W_DBW108: 'DB1001,INT108', // 分拣机2转向命令
+  W_DBW110: 'DB1001,INT110', // 分拣机3转向命令
+  W_DBW112: 'DB1001,INT112', // 分拣机4转向命令
+  W_DBW114: 'DB1001,INT114', // 分拣机5转向命令
+  W_DBW116: 'DB1001,INT116' // 分拣机6转向命令
 };
 
 var writeStrArr = [0, 0, 0, 0, 0];
