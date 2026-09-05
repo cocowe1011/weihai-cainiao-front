@@ -1550,7 +1550,7 @@ export default {
       // 六面扫Socket连接状态
       sixScanSocketConnected: false,
       // 分拣口容量统一配置（通用口共用：大包容量/小包容量；12号异常口容量无限）
-      largePortCapacity: 1,
+      largePortCapacity: 5,
       smallPortCapacity: 8,
       // 分拣口配置（1-11通用口，不区分大小件；12异常口）
       // 方向：1=左转（偶数口，布局图上排），2=右转（奇数口，布局图下排）
@@ -1638,7 +1638,7 @@ export default {
         6: 38000
       },
       // 到达时间匹配容差（毫秒）
-      sorterArrivalTolerance: 1500,
+      sorterArrivalTolerance: 2000,
       // 从五面扫进队到X光机光电的固定行进时间（毫秒）
       xrayTravelTime: 11000,
       // 已发命令货物的超时清理阈值（毫秒）
@@ -2547,7 +2547,7 @@ export default {
       const travelTime = this.sorterTravelTimes[machineNo];
       if (!travelTime) return;
       const uploadQueue = this.queues[0];
-      // 在上货队列中找应到达时间误差在±1.5秒以内、且未发过命令的货物（取偏差最小者）
+      // 在上货队列中找应到达时间误差在±2秒以内、且未发过命令的货物（取偏差最小者）
       let matched = null;
       let matchedDev = Infinity;
       uploadQueue.trayInfo.forEach((item) => {
@@ -2588,7 +2588,7 @@ export default {
         }，1秒后取消）`
       );
     },
-    // X光机剔除：01013光电下降沿后，若有剔除信号，按进队+11s±1.5s匹配货物并改发12号口
+    // X光机剔除：01013光电下降沿后，若有剔除信号，按进队+11s±2s匹配货物并改发12号口
     handleXrayRejectTrigger() {
       if (this.wcsDockWord16.bit0 !== '1') return;
       const now = Date.now();
