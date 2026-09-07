@@ -1130,16 +1130,20 @@
                             </div>
                           </div>
                         </div>
-                        <!-- 第四行：分拣口 12（异常口，容量无限，不呼叫AGV） -->
+                        <!-- 第四行：分拣口 12（X光机异常口，满5呼叫AGV） -->
                         <div class="scan-group-row">
                           <div class="scan-group with-watermark sort-port-card">
                             <div class="group-watermark">12</div>
                             <div class="group-items">
                               <div class="scan-item">
-                                <span class="scan-label">异常口计数</span>
-                                <span class="scan-value">{{
-                                  sortPortPlcCounts[12] || 0
-                                }}</span>
+                                <span class="scan-label">呼叫AGV</span>
+                                <button
+                                  class="port-send-btn"
+                                  title="发送呼叫"
+                                  @click="callAgv(12)"
+                                >
+                                  <el-icon><Promotion /></el-icon>
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -1549,9 +1553,10 @@ export default {
       lastAllocPortNo: 0,
       // 六面扫Socket连接状态
       sixScanSocketConnected: false,
-      // 分拣口容量统一配置（通用口共用：大包容量/小包容量；12号异常口容量无限）
+      // 分拣口容量统一配置（通用口共用：大包容量/小包容量；12号异常口固定容量不区分大小件）
       largePortCapacity: 5,
       smallPortCapacity: 8,
+      exceptionPortCapacity: 5,
       // 分拣口配置（1-11通用口，不区分大小件；12异常口）
       // 方向：1=左转（偶数口，布局图上排），2=右转（奇数口，布局图下排）
       sortPortConfig: [
@@ -1642,7 +1647,7 @@ export default {
       // 从五面扫进队到X光机光电的固定行进时间（毫秒）
       xrayTravelTime: 11000,
       // 已发命令货物的超时清理阈值（毫秒）
-      cmdSentTimeoutMs: 3800,
+      cmdSentTimeoutMs: 4500,
       // 上货队列清理轮询定时器
       uploadQueueCleanTimer: null,
       showTestPanel: false,
@@ -2426,43 +2431,45 @@ export default {
       this.handleScanEnqueue(this.sixScanBarcode);
     },
     // 扫码进队入口：五面扫扫到条码即直接进入上货队列（不再监听目的地触发信号）
-    // 正常条码走分配分拣口流程（只记录分拣口编号，不写PLC）；异常条码进队发12号口
+    // 正常条码走分配分拣口流程；NoRead/多码/菜鸟失败/分配失败不进队，12口只进X光机剔除件
     async handleScanEnqueue(barcode) {
       const code = (barcode || '').trim();
       if (!code) return;
 
-      // NoRead / 多码（逗号分隔或[xxxx][xxxx]格式）→ 异常件，进队发12号口
+      // NoRead / 多码：不进上货队列，仅本地日志
       const isNoRead = code.indexOf('NoRead') !== -1;
       const isCommaMulti = code.split(',').length > 1;
       const bracketMatches = code.match(/\[[^\]]*\]/g);
       const isBracketMulti = bracketMatches && bracketMatches.length >= 2;
       if (isNoRead || isCommaMulti || isBracketMulti) {
         const reason = isNoRead ? '五面扫未读到条码' : '五面扫读到多码';
-        this.enqueueExceptionItem(`EX${Date.now()}`, `${reason}（${code}）`);
+        this.addLog(`${reason}（${code}），不进入上货队列`, 'alarm');
         return;
       }
 
       // 正常条码：查包裹信息（停用菜鸟走 mock，否则查菜鸟接口），不做重复检测
       const packageInfo = await this.resolvePackageInfo(code);
       if (!packageInfo) {
-        // 菜鸟查询失败：按异常件进队发12号口
-        this.enqueueExceptionItem(code, `菜鸟大包查询失败（条码 ${code}）`);
+        this.addLog(
+          `菜鸟大包查询失败（条码 ${code}），不进入上货队列`,
+          'alarm'
+        );
         return;
       }
       this.nowScanTrayInfo = packageInfo;
       const packageSize = packageInfo.packageSize;
       try {
         // 1. 分配分拣口（1~11循环；同口仅允许同渠道、同大小包裹）
-        // 分配失败：仍进上货队列，改发12号异常口
-        let port = this.allocateSortPort(packageSize, packageInfo.channel);
+        // 分配失败：不进上货队列，仅本地日志（12口只进X光机剔除件）
+        const port = this.allocateSortPort(packageSize, packageInfo.channel);
         if (!port) {
-          port = { portNo: 12, machineNo: 6, direction: 1 };
           this.addLog(
             `无法分配分拣口（渠道 ${packageInfo.channel || '--'}，${
               packageSize === 'large' ? '大包' : '小包'
-            }），改发12号异常口`,
+            }，条码 ${code}），不进入上货队列`,
             'alarm'
           );
+          return;
         }
 
         // 2. 保存订单到 order_info
@@ -2513,33 +2520,6 @@ export default {
           `扫码进队处理失败，条码：${code}，原因：${error.message || '请重试'}`
         );
       }
-    },
-    // 异常件进上货队列：只发12号口（分拣机6左转），不查菜鸟、不落库
-    enqueueExceptionItem(packageNo, reason) {
-      const queueItem = {
-        orderInfoId: null,
-        packageNo,
-        trayTime: moment().format('YYYY-MM-DD HH:mm:ss'),
-        channel: '',
-        packageSize: '',
-        packingWeight: 0,
-        expectedQty: 0,
-        trayStatus: '1',
-        allocatedPortNo: 12, // 异常口
-        machineNo: 6,
-        direction: 1, // 分拣机6左转即12号口
-        enqueueTs: Date.now(),
-        cmdSent: false,
-        cmdSentTs: null
-      };
-      this.queues[0].trayInfo.push(queueItem);
-      if (this.selectedQueueIndex === 0) {
-        this.showTrays(0);
-      }
-      this.addLog(
-        `${reason}，异常件已进上货队列（大包号 ${packageNo}），发12号异常口，上货队列当前 ${this.queues[0].trayInfo.length} 件`,
-        'alarm'
-      );
     },
     // 分拣机前光电触发：按进队时间+固定行进时长匹配应到达货物，发转向命令
     handleSorterPhotoTrigger(machineNo) {
@@ -2618,7 +2598,7 @@ export default {
         `X光机剔除：大包 ${matched.packageNo} 到达（偏差${matchedDev}ms），目的地由分拣口${prevPort}改为12号异常口`
       );
     },
-    // 启动上货队列超时清理轮询（500ms）：已发命令超3.8s未进分拣口的货物直接删除
+    // 启动上货队列超时清理轮询（500ms）：已发命令超4.5s未进分拣口的货物直接删除
     startUploadQueueCleaner() {
       this.stopUploadQueueCleaner();
       this.uploadQueueCleanTimer = setInterval(() => {
@@ -2683,32 +2663,34 @@ export default {
           'alarm'
         );
       }
-      if (!moved) return;
-      // 分拣口包裹数量变化，检查并更新DBW100
-      this.checkAndWriteDBW100();
-      // 刷新当前选中队列显示
-      if (this.selectedQueueIndex === 0 || this.selectedQueueIndex === portNo) {
-        this.$nextTick(() => {
-          this.showTrays(this.selectedQueueIndex);
-        });
-      }
-      // 通用口满容量判断（12号异常口容量无限，不触发）
-      if (portNo !== 12) {
-        const maxCapacity = this.getPortCapacity(
-          this.getQueuePackageSize(targetQueue)
-        );
-        if (targetQueue.trayInfo.length >= maxCapacity) {
-          this.handleSortPortFull(portNo);
+      if (moved) {
+        this.checkAndWriteDBW100();
+        if (
+          this.selectedQueueIndex === 0 ||
+          this.selectedQueueIndex === portNo
+        ) {
+          this.$nextTick(() => {
+            this.showTrays(this.selectedQueueIndex);
+          });
         }
+      }
+      // 12号异常口：满容量仍走原先 PLC 计数逻辑（满5直接呼叫AGV），不按队列件数触发
+      const portConfig = this.sortPortConfig.find((p) => p.portNo === portNo);
+      if (portConfig && portConfig.sizeType === 'exception') {
+        this.onExceptionPortPlcCount(portNo, Number(newVal) || 0);
+        return;
+      }
+      if (!moved) return;
+      const maxCapacity = this.getPortCapacity(
+        this.getQueuePackageSize(targetQueue)
+      );
+      if (targetQueue.trayInfo.length >= maxCapacity) {
+        this.handleSortPortFull(portNo);
       }
     },
     // ========== AGV/MCS 相关方法 ==========
     // 手动呼叫AGV：弹出确认后直接呼叫AGV取货（不做计数校验）
     callAgv(portNo) {
-      if (portNo === 12) {
-        this.addLog('12号异常口容量无限，不呼叫AGV');
-        return;
-      }
       this.$confirm('本操作会呼叫AGV取货，并锁定分拣口，是否继续？', '警告', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
@@ -2721,10 +2703,58 @@ export default {
           this.$message.info('已取消呼叫AGV');
         });
     },
+    // 异常口（12）PLC计数变化：达到最大容量且未锁定时，直接呼叫AGV
+    onExceptionPortPlcCount(portNo, plcCount) {
+      const queue = this.queues[portNo];
+      if (!queue || queue.isLock === '1') return;
+      const maxCapacity = this.exceptionPortCapacity;
+      if ((plcCount || 0) < maxCapacity) return;
+      this.handleSortPortFull(portNo);
+    },
+    // 异常口（12）自动补齐队列包裹，使队列数量与PLC计数一致
+    autoFillExceptionPortQueue(portNo, plcCount) {
+      const queue = this.queues[portNo];
+      if (!queue) return;
+      const needCount = (plcCount || 0) - queue.trayInfo.length;
+      if (needCount <= 0) return;
+      const usedNos = new Set(
+        queue.trayInfo.map((t) => (t.packageNo || '').trim())
+      );
+      let seq = 0;
+      const genPackageNo = () => {
+        let no;
+        do {
+          const num = String((Date.now() + seq++) % 100000000).padStart(8, '0');
+          no = `KRRM${num}`;
+        } while (usedNos.has(no));
+        usedNos.add(no);
+        return no;
+      };
+      for (let i = 0; i < needCount; i++) {
+        queue.trayInfo.push({
+          orderInfoId: null,
+          packageNo: genPackageNo(),
+          trayTime: moment().format('YYYY-MM-DD HH:mm:ss'),
+          channel: '',
+          packingWeight: 0,
+          expectedQty: 0,
+          trayStatus: '1',
+          allocatedPortNo: portNo,
+          destinationCode: '',
+          isInQueue: '1'
+        });
+      }
+      this.addLog(
+        `分拣口${portNo}（异常口）队列数量与PLC计数不一致，自动补齐${needCount}个包裹（补齐后${queue.trayInfo.length}件，PLC计数${plcCount}）`
+      );
+      if (this.selectedQueueIndex === portNo) {
+        this.$nextTick(() => {
+          this.showTrays(portNo);
+        });
+      }
+    },
     // 分拣口队列达到最大容量后，对比PLC计数与队列数量，决定呼叫AGV或锁定报警
-    // 仅通用口（1~11）参与；12号异常口容量无限，不触发满容量
     async handleSortPortFull(portNo) {
-      if (portNo === 12) return; // 12号异常口容量无限，不呼叫AGV
       const queueIndex = portNo; // queues[1]=分拣口1, ..., queues[12]=分拣口12
       const queue = this.queues[queueIndex];
       if (!queue) {
@@ -2737,10 +2767,32 @@ export default {
         return;
       }
 
-      // 通用口按口内包裹大小取统一配置（大包/小包容量不同）
-      const maxCapacity = this.getPortCapacity(this.getQueuePackageSize(queue));
+      const portConfig = this.sortPortConfig.find((p) => p.portNo === portNo);
+      // 异常口（12）固定容量不区分大小件；通用口按口内包裹大小取统一配置
+      const isExceptionPort = portConfig && portConfig.sizeType === 'exception';
+      const maxCapacity = isExceptionPort
+        ? this.exceptionPortCapacity
+        : this.getPortCapacity(this.getQueuePackageSize(queue));
       const queueCount = queue.trayInfo.length;
       const plcCount = this.sortPortPlcCounts[portNo] || 0;
+
+      // 异常口（12）：PLC计数达到最大容量即直接呼叫AGV，不校验队列数量一致；数量不足自动补齐
+      if (isExceptionPort) {
+        if (plcCount < maxCapacity) {
+          this.addLog(
+            `分拣口${portNo}（异常口）PLC计数${plcCount}未达最大容量${maxCapacity}，暂不呼叫AGV`
+          );
+          return;
+        }
+        if (queueCount < plcCount) {
+          this.autoFillExceptionPortQueue(portNo, plcCount);
+        }
+        this.addLog(
+          `分拣口${portNo}（异常口）PLC计数达到${plcCount}，直接呼叫AGV取货`
+        );
+        await this.doCallAgv(portNo);
+        return;
+      }
 
       this.addLog(
         `分拣口${portNo}队列已满（${queueCount}/${maxCapacity}），PLC计数：${plcCount}，队列数量：${queueCount}`
@@ -2773,10 +2825,6 @@ export default {
     },
     // 核心AGV呼叫逻辑：调MCS通知AGV取货 + 锁定队列 + 发PLC禁止进货
     async doCallAgv(portNo) {
-      if (portNo === 12) {
-        this.addLog('12号异常口容量无限，不呼叫AGV');
-        return;
-      }
       const queueIndex = portNo;
       const queue = this.queues[queueIndex];
       if (!queue) {
@@ -2869,21 +2917,20 @@ export default {
     // 条件2：所有分拣口队列的状态都是AGV运输状态（trayStatus='0'或'1'） → 写1
     // 否则 → 写0
     checkAndWriteDBW100() {
-      // 检查所有通用分拣口（1~11）是否都达到最大容量（12号异常口容量无限，不参与）
-      const normalPorts = this.sortPortConfig.filter(
-        (port) => port.sizeType !== 'exception'
-      );
-      const allPortsFull = normalPorts.every((port) => {
+      // 检查所有分拣口（1~12）是否都达到最大容量
+      const allPortsFull = this.sortPortConfig.every((port) => {
         const queue = this.queues[port.portNo];
         if (!queue) return false;
-        // 通用口按口内包裹大小取容量
-        const capacity = this.getPortCapacity(this.getQueuePackageSize(queue));
+        const capacity =
+          port.sizeType === 'exception'
+            ? this.exceptionPortCapacity
+            : this.getPortCapacity(this.getQueuePackageSize(queue));
         return queue.trayInfo.length >= capacity;
       });
 
-      // 检查所有通用分拣口队列的状态是否都是AGV运输状态
+      // 检查所有分拣口队列的状态是否都是AGV运输状态
       // AGV运输状态：trayStatus='0'（等待AGV取货）或'1'（AGV取货完成）
-      const allQueuesInAgv = normalPorts.every((port) => {
+      const allQueuesInAgv = this.sortPortConfig.every((port) => {
         const queue = this.queues[port.portNo];
         if (!queue) return false;
         return queue.trayStatus === '0' || queue.trayStatus === '1';
