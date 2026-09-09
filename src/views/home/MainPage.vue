@@ -1648,6 +1648,8 @@ export default {
       xrayTravelTime: 11000,
       // 已发命令货物的超时清理阈值（毫秒）
       cmdSentTimeoutMs: 4500,
+      // 未发转向命令：超过「进队+到达分拣机时长」后再等这么久仍未发命令，视为意外，从上货队列删除
+      cmdNotSentOverdueMs: 3000,
       // 上货队列清理轮询定时器
       uploadQueueCleanTimer: null,
       showTestPanel: false,
@@ -2598,7 +2600,9 @@ export default {
         `X光机剔除：大包 ${matched.packageNo} 到达（偏差${matchedDev}ms），目的地由分拣口${prevPort}改为12号异常口`
       );
     },
-    // 启动上货队列超时清理轮询（500ms）：已发命令超4.5s未进分拣口的货物直接删除
+    // 启动上货队列超时清理轮询（500ms）：
+    // 1）已发转向命令超4.5s仍未进分拣口 → 删除
+    // 2）到对应分拣机应到达时刻后再超时3s仍未发转向命令 → 删除（避免幽灵货占口名额）
     startUploadQueueCleaner() {
       this.stopUploadQueueCleaner();
       this.uploadQueueCleanTimer = setInterval(() => {
@@ -2623,6 +2627,28 @@ export default {
               }ms未进入分拣口，已从上货队列删除`,
               'alarm'
             );
+            continue;
+          }
+          // 从未发过转向命令：超过「进队时刻 + 该分拣机行进时长 + 3s」仍未发命令，视为意外
+          if (!item.cmdSent && item.enqueueTs) {
+            const travelTime = this.sorterTravelTimes[item.machineNo];
+            if (
+              travelTime &&
+              now - item.enqueueTs > travelTime + this.cmdNotSentOverdueMs
+            ) {
+              uploadQueue.trayInfo.splice(i, 1);
+              removed++;
+              this.addLog(
+                `上货队列超时清理：大包 ${item.packageNo}（目标分拣口${
+                  item.allocatedPortNo
+                }，分拣机${item.machineNo}）进队后${
+                  now - item.enqueueTs
+                }ms仍未发送转向命令（应${travelTime}ms到达，已超时${
+                  this.cmdNotSentOverdueMs
+                }ms），已从上货队列删除`,
+                'alarm'
+              );
+            }
           }
         }
         if (removed > 0 && this.selectedQueueIndex === 0) {
