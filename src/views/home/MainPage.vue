@@ -1522,6 +1522,7 @@
 import HttpUtil from '@/utils/HttpUtil';
 import HttpUtilMcs from '@/utils/HttpUtilMcs';
 import HttpUtilCainiao from '@/utils/HttpUtilCainiao';
+import { EventBus } from '@/utils/EventBus';
 import moment from 'moment';
 import { ipcRenderer } from 'electron';
 import OrderQueryDialog from '@/components/OrderQueryDialog.vue';
@@ -1642,14 +1643,14 @@ export default {
         5: 34000,
         6: 38000
       },
-      // 到达时间匹配容差（毫秒）
+      // 到达时间匹配容差（毫秒），可由配置页动态刷新
       sorterArrivalTolerance: 2000,
       // 从五面扫进队到X光机光电的固定行进时间（毫秒）
       xrayTravelTime: 11000,
-      // 已发命令货物的超时清理阈值（毫秒）
+      // 已发命令货物的超时清理阈值（毫秒），可由配置页动态刷新
       cmdSentTimeoutMs: 4500,
       // 未发转向命令：超过「进队+到达分拣机时长」后再等这么久仍未发命令，视为意外，从上货队列删除
-      cmdNotSentOverdueMs: 3000,
+      cmdNotSentOverdueMs: 5000,
       // 上货队列清理轮询定时器
       uploadQueueCleanTimer: null,
       showTestPanel: false,
@@ -2083,6 +2084,11 @@ export default {
   },
   mounted() {
     this.initializeMarkers();
+    this.loadBizConfig();
+    this._onReFlushConfig = () => {
+      this.loadBizConfig();
+    };
+    EventBus.$on('reFlushConfig', this._onReFlushConfig);
     this.loadQueueInfoFromDatabase();
     // 数据加载完成后创建监听（跳过 id 为 1-5 的队列）
     this._queueWatchers = []; // 保存 watcher 取消函数
@@ -2265,6 +2271,51 @@ export default {
     }, 3000);
   },
   methods: {
+    applyBizConfig(cfg) {
+      if (!cfg) return;
+      const toMs = (sec) => {
+        if (sec === null || sec === undefined || sec === '') return null;
+        const n = Number(sec);
+        return Number.isFinite(n) ? n * 1000 : null;
+      };
+      const toInt = (val) => {
+        if (val === null || val === undefined || val === '') return null;
+        const n = Number(val);
+        return Number.isFinite(n) ? n : null;
+      };
+      const arrivalMs = toMs(cfg.arrivalToleranceSec);
+      if (arrivalMs != null) {
+        this.sorterArrivalTolerance = arrivalMs;
+      }
+      const notEnteredMs = toMs(cfg.notEnteredTimeoutSec);
+      if (notEnteredMs != null) {
+        this.cmdSentTimeoutMs = notEnteredMs;
+      }
+      const cmdNotSentMs = toMs(cfg.cmdNotSentTimeoutSec);
+      if (cmdNotSentMs != null) {
+        this.cmdNotSentOverdueMs = cmdNotSentMs;
+      }
+      const largeCap = toInt(cfg.largePortCapacity);
+      if (largeCap != null) {
+        this.largePortCapacity = largeCap;
+      }
+      const smallCap = toInt(cfg.smallPortCapacity);
+      if (smallCap != null) {
+        this.smallPortCapacity = smallCap;
+      }
+    },
+    loadBizConfig() {
+      HttpUtil.get('/cssConfig/getConfig')
+        .then((res) => {
+          this.applyBizConfig(res.data);
+          this.addLog(
+            `业务配置已刷新：光电误差±${this.sorterArrivalTolerance}ms，未进口清理${this.cmdSentTimeoutMs}ms，未发命令清理${this.cmdNotSentOverdueMs}ms，大包容量${this.largePortCapacity}，小包容量${this.smallPortCapacity}`
+          );
+        })
+        .catch((err) => {
+          console.log('biz config load error!', err);
+        });
+    },
     buildTwinPayload() {
       const motors = [];
       for (let motorId = 1; motorId <= 32; motorId++) {
@@ -2601,8 +2652,8 @@ export default {
       );
     },
     // 启动上货队列超时清理轮询（500ms）：
-    // 1）已发转向命令超4.5s仍未进分拣口 → 删除
-    // 2）到对应分拣机应到达时刻后再超时3s仍未发转向命令 → 删除（避免幽灵货占口名额）
+    // 1）已发转向命令超过 cmdSentTimeoutMs 仍未进分拣口 → 删除
+    // 2）到对应分拣机应到达时刻后再超时 cmdNotSentOverdueMs 仍未发转向命令 → 删除
     startUploadQueueCleaner() {
       this.stopUploadQueueCleaner();
       this.uploadQueueCleanTimer = setInterval(() => {
@@ -3978,6 +4029,10 @@ export default {
     this.stopTwinMqttPublish();
     // 断开六面扫Socket连接
     this.disconnectSixScan();
+    if (this._onReFlushConfig) {
+      EventBus.$off('reFlushConfig', this._onReFlushConfig);
+      this._onReFlushConfig = null;
+    }
   }
 };
 </script>

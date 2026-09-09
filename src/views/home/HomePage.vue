@@ -173,6 +173,7 @@ export default {
       const items = [
         { index: '1', label: '首页', icon: 'HomeFilled' },
         { index: '2', label: '业务', icon: 'Operation' },
+        { index: '4', label: '配置', icon: 'Tools' },
         {
           index: '3',
           label: '用户',
@@ -215,6 +216,15 @@ export default {
             if (this.$route.path !== '/homePage/userManagement') {
               this.$router.replace({
                 path: '/homePage/userManagement'
+              });
+            }
+          });
+          break;
+        case '4':
+          this.$nextTick(() => {
+            if (this.$route.path !== '/homePage/systemConfig') {
+              this.$router.replace({
+                path: '/homePage/systemConfig'
               });
             }
           });

@@ -34,6 +34,11 @@ const routes = [
         name: 'AboutPage'
       },
       {
+        path: 'systemConfig',
+        component: () => import('../views/config/SystemConfig.vue'),
+        name: 'SystemConfig'
+      },
+      {
         path: 'userManagement',
         component: () => import('../views/home/UserManagement.vue'),
         name: 'UserManagement'
