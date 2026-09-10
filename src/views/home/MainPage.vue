@@ -2484,43 +2484,39 @@ export default {
       this.handleScanEnqueue(this.sixScanBarcode);
     },
     // 扫码进队入口：五面扫扫到条码即直接进入上货队列（不再监听目的地触发信号）
-    // 正常条码走分配分拣口流程；NoRead/多码/菜鸟失败/分配失败不进队，12口只进X光机剔除件
+    // 正常条码走分配分拣口流程；NoRead/多码/菜鸟失败/分配失败不进队，给PLC发剔除命令
     async handleScanEnqueue(barcode) {
       const code = (barcode || '').trim();
       if (!code) return;
 
-      // NoRead / 多码：不进上货队列，仅本地日志
+      // NoRead / 多码：不进上货队列，发剔除命令
       const isNoRead = code.indexOf('NoRead') !== -1;
       const isCommaMulti = code.split(',').length > 1;
       const bracketMatches = code.match(/\[[^\]]*\]/g);
       const isBracketMulti = bracketMatches && bracketMatches.length >= 2;
       if (isNoRead || isCommaMulti || isBracketMulti) {
         const reason = isNoRead ? '五面扫未读到条码' : '五面扫读到多码';
-        this.addLog(`${reason}（${code}），不进入上货队列`, 'alarm');
+        this.rejectScanNotEnqueue(`${reason}（${code}）`);
         return;
       }
 
       // 正常条码：查包裹信息（停用菜鸟走 mock，否则查菜鸟接口），不做重复检测
       const packageInfo = await this.resolvePackageInfo(code);
       if (!packageInfo) {
-        this.addLog(
-          `菜鸟大包查询失败（条码 ${code}），不进入上货队列`,
-          'alarm'
-        );
+        this.rejectScanNotEnqueue(`菜鸟大包查询失败（条码 ${code}）`);
         return;
       }
       this.nowScanTrayInfo = packageInfo;
       const packageSize = packageInfo.packageSize;
       try {
         // 1. 分配分拣口（1~11循环；同口仅允许同渠道、同大小包裹）
-        // 分配失败：不进上货队列，仅本地日志（12口只进X光机剔除件）
+        // 分配失败：不进上货队列，发剔除命令（12口只进X光机剔除件）
         const port = this.allocateSortPort(packageSize, packageInfo.channel);
         if (!port) {
-          this.addLog(
+          this.rejectScanNotEnqueue(
             `无法分配分拣口（渠道 ${packageInfo.channel || '--'}，${
               packageSize === 'large' ? '大包' : '小包'
-            }，条码 ${code}），不进入上货队列`,
-            'alarm'
+            }，条码 ${code}）`
           );
           return;
         }
@@ -2569,10 +2565,26 @@ export default {
       } catch (error) {
         console.error('扫码进队处理失败:', error);
         this.$message.error(`扫码进队处理失败：${error.message || '请重试'}`);
-        this.addLog(
+        this.rejectScanNotEnqueue(
           `扫码进队处理失败，条码：${code}，原因：${error.message || '请重试'}`
         );
       }
+    },
+    // 不进上货队列：给PLC发剔除命令 DBW118=1，保持2秒后取消
+    rejectScanNotEnqueue(reason) {
+      const cmdAdd = 'W_DBW118';
+      ipcRenderer.send('writeSingleValueToPLC', cmdAdd, 1);
+      if (this._plcRejectCancelTimer) {
+        clearTimeout(this._plcRejectCancelTimer);
+      }
+      this._plcRejectCancelTimer = setTimeout(() => {
+        ipcRenderer.send('cancelWriteToPLC', cmdAdd);
+        this._plcRejectCancelTimer = null;
+      }, 2000);
+      this.addLog(
+        `${reason}，不进入上货队列，已发剔除命令 ${cmdAdd}=1（保持2秒）`,
+        'alarm'
+      );
     },
     // 分拣机前光电触发：按进队时间+固定行进时长匹配应到达货物，发转向命令
     handleSorterPhotoTrigger(machineNo) {
