@@ -578,6 +578,7 @@ function conPLC() {
           conn.addItems('DBW1242'); // 分拣口10计数
           conn.addItems('DBW1244'); // 分拣口11计数
           conn.addItems('DBW1246'); // 分拣口12计数
+          conn.addItems('DBW1252'); // 读码上货触发信号（上升沿）
           // 单连接串行读写，避免 read/write 并发导致整批 BAD 255
           startPlcIoScheduler();
         }
@@ -672,6 +673,7 @@ var variables = {
   DBW1242: 'DB1000,INT1242', // 分拣口10计数
   DBW1244: 'DB1000,INT1244', // 分拣口11计数
   DBW1246: 'DB1000,INT1246', // 分拣口12计数
+  DBW1252: 'DB1000,INT1252', // 读码上货触发信号（上升沿）
   // —— 写入（写入点位.csv / DB1001）——
   W_DBW0: 'DB1001,INT0', // WCS看门狗心跳
   W_DBW2: 'DB1001,INT2', // WCS-全线启动（系统在线）

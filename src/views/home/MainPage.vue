@@ -1361,7 +1361,7 @@
                 size="small"
                 @click="triggerScanEnqueue"
               >
-                模拟扫码进队
+                模拟上货触发信号
               </el-button>
             </div>
           </div>
@@ -1550,6 +1550,10 @@ export default {
       sixScanBarcode: '',
       lastProcessedBarcode: '',
       sixScanProcessing: false,
+      // DBW1252 读码上货触发信号当前值（0 -> 非0 上升沿触发进队）
+      uploadTriggerSignal: 0,
+      // 上货触发限流时间戳（2秒内重复信号不处理，参照历史目的地请求限流）
+      lastUploadTriggerTime: 0,
       // 分拣口循环下发游标（满容量后按 1→11 顺序循环开新空口）
       lastAllocPortNo: 0,
       // 六面扫Socket连接状态
@@ -2032,6 +2036,22 @@ export default {
       if (!this.isDataReady) return;
       if (newVal === '0' && oldVal === '1') this.handleXrayRejectTrigger();
     },
+    // —— 读码上货触发：DBW1252 上升沿（0 -> 非0）取当前五面扫条码进队 ——
+    uploadTriggerSignal(newVal, oldVal) {
+      if (!this.isDataReady) return;
+      // 上升沿检测：0 -> 非0 表示PLC触发读码上货
+      if (newVal !== 0 && oldVal === 0) {
+        this.addLog('收到读码上货触发信号（DBW1252上升沿）', 'running');
+        // 限流：2秒内重复请求不处理（参照历史目的地请求信号限流）
+        const now = Date.now();
+        if (now - this.lastUploadTriggerTime < 2000) {
+          this.addLog('读码上货触发信号限流：2秒内重复触发，已忽略', 'alarm');
+          return;
+        }
+        this.lastUploadTriggerTime = now;
+        this.handleUploadTrigger();
+      }
+    },
     // —— 分拣口PLC计数增量：计数增加时把已发命令货物从上货队列移入分拣口 ——
     'sortPortPlcCounts.1'(newVal, oldVal) {
       if (!this.isDataReady) return;
@@ -2261,6 +2281,8 @@ export default {
       this.sortPortPlcCounts[10] = Number(values.DBW1242 ?? 0);
       this.sortPortPlcCounts[11] = Number(values.DBW1244 ?? 0);
       this.sortPortPlcCounts[12] = Number(values.DBW1246 ?? 0);
+      // 读码上货触发信号（DBW1252）
+      this.uploadTriggerSignal = Number(values.DBW1252 ?? 0);
     };
     ipcRenderer.on('receivedMsg', this.receivedMsgHandler);
     // 给PLC数据加载时间
@@ -2461,7 +2483,7 @@ export default {
         this._sixScanSocket = null;
       }
     },
-    // 处理六面扫Socket发来的条码数据：解析后直接进上货队列
+    // 处理五面扫Socket发来的条码数据：只赋值缓存，等DBW1252上升沿触发再进队
     handleSixScanSocketData(rawBarcode) {
       const rawStr = (rawBarcode || '').trim();
       // 始终显示原始数据到面板（去掉首尾方括号）
@@ -2471,19 +2493,30 @@ export default {
       const bracketSegments = rawStr.match(/\[[^\]]*\]/g);
       if (bracketSegments && bracketSegments.length >= 2) {
         this.sixScanBarcode = rawStr;
-        this.handleScanEnqueue(rawStr);
+        this.addLog(`五面扫条码已赋值（多码）：${rawStr}，等待上货触发信号`);
         return;
       }
 
-      // 单码：提取方括号内容后直接进队
+      // 单码：提取方括号内容后赋值缓存
       let innerContent = rawStr;
       if (rawStr.startsWith('[') && rawStr.endsWith(']')) {
         innerContent = rawStr.slice(1, -1);
       }
       this.sixScanBarcode = innerContent.trim();
-      this.handleScanEnqueue(this.sixScanBarcode);
+      this.addLog(`五面扫条码已赋值：${this.sixScanBarcode}，等待上货触发信号`);
     },
-    // 扫码进队入口：五面扫扫到条码即直接进入上货队列（不再监听目的地触发信号）
+    // 读码上货触发入口（DBW1252上升沿触发）：拿当前赋值的五面扫条码走上货流程
+    handleUploadTrigger() {
+      const code = (this.sixScanBarcode || '').trim();
+      if (!code) {
+        // 触发了上货信号但五面扫无条码数据，属异常：发剔除命令不进队
+        this.rejectScanNotEnqueue('收到上货触发信号，但当前无条码数据');
+        return;
+      }
+      this.addLog(`读码上货触发，取当前条码进队：${code}`);
+      this.handleScanEnqueue(code);
+    },
+    // 扫码进队入口：DBW1252上升沿触发时拿当前五面扫条码进入上货队列
     // 正常条码走分配分拣口流程；NoRead/多码/菜鸟失败/分配失败不进队，给PLC发剔除命令
     async handleScanEnqueue(barcode) {
       const code = (barcode || '').trim();
@@ -3256,15 +3289,25 @@ export default {
       this.addLog('手动触发X光电下降沿（测试）');
       this.handleXrayRejectTrigger();
     },
-    // 手动模拟扫码进队（测试用）
+    // 手动模拟DBW1252上货触发上升沿（测试用）：置1保持1秒后回0，走真实watcher
     triggerScanEnqueue() {
-      const code = (this.sixScanBarcode || '').trim();
-      if (!code) {
-        this.$message.warning('请先输入条码');
+      if (this.uploadTriggerSignal !== 0) {
+        this.$message.warning('上货触发信号已在触发中，请稍候');
         return;
       }
-      this.addLog(`手动模拟扫码进队（测试），条码：${code}`);
-      this.handleScanEnqueue(code);
+      this.addLog(
+        `手动模拟DBW1252上货触发信号（测试），当前条码：${
+          (this.sixScanBarcode || '').trim() || '--'
+        }`
+      );
+      this.uploadTriggerSignal = 1;
+      if (this._uploadTriggerTestTimer) {
+        clearTimeout(this._uploadTriggerTestTimer);
+      }
+      this._uploadTriggerTestTimer = setTimeout(() => {
+        this.uploadTriggerSignal = 0;
+        this._uploadTriggerTestTimer = null;
+      }, 1000);
     },
     changeQueueExpanded() {
       this.isQueueExpanded = !this.isQueueExpanded;
@@ -4041,6 +4084,11 @@ export default {
     this.stopTwinMqttPublish();
     // 断开六面扫Socket连接
     this.disconnectSixScan();
+    // 清除上货触发模拟测试定时器
+    if (this._uploadTriggerTestTimer) {
+      clearTimeout(this._uploadTriggerTestTimer);
+      this._uploadTriggerTestTimer = null;
+    }
     if (this._onReFlushConfig) {
       EventBus.$off('reFlushConfig', this._onReFlushConfig);
       this._onReFlushConfig = null;
