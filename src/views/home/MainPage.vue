@@ -1647,8 +1647,10 @@ export default {
         5: 34000,
         6: 38000
       },
-      // 到达时间匹配容差（毫秒），可由配置页动态刷新
+      // 到达时间匹配正向容差（毫秒，货物早到），可由配置页动态刷新
       sorterArrivalTolerance: 2000,
+      // 到达时间匹配负向容差（毫秒，货物晚到），配置存 css_config.speed_two
+      sorterArrivalToleranceNeg: 2000,
       // 从五面扫进队到X光机光电的固定行进时间（毫秒）
       xrayTravelTime: 11000,
       // 已发命令货物的超时清理阈值（毫秒），可由配置页动态刷新
@@ -2309,6 +2311,10 @@ export default {
       if (arrivalMs != null) {
         this.sorterArrivalTolerance = arrivalMs;
       }
+      const arrivalNegMs = toMs(cfg.speedTwo);
+      if (arrivalNegMs != null) {
+        this.sorterArrivalToleranceNeg = arrivalNegMs;
+      }
       const notEnteredMs = toMs(cfg.notEnteredTimeoutSec);
       if (notEnteredMs != null) {
         this.cmdSentTimeoutMs = notEnteredMs;
@@ -2331,7 +2337,7 @@ export default {
         .then((res) => {
           this.applyBizConfig(res.data);
           this.addLog(
-            `业务配置已刷新：光电误差±${this.sorterArrivalTolerance}ms，未进口清理${this.cmdSentTimeoutMs}ms，未发命令清理${this.cmdNotSentOverdueMs}ms，大包容量${this.largePortCapacity}，小包容量${this.smallPortCapacity}`
+            `业务配置已刷新：光电误差+${this.sorterArrivalTolerance}/-${this.sorterArrivalToleranceNeg}ms，未进口清理${this.cmdSentTimeoutMs}ms，未发命令清理${this.cmdNotSentOverdueMs}ms，大包容量${this.largePortCapacity}，小包容量${this.smallPortCapacity}`
           );
         })
         .catch((err) => {
@@ -2625,20 +2631,25 @@ export default {
       const travelTime = this.sorterTravelTimes[machineNo];
       if (!travelTime) return;
       const uploadQueue = this.queues[0];
-      // 在上货队列中找应到达时间误差在±2秒以内、且未发过命令的货物（取偏差最小者）
+      // 在上货队列中找应到达时间误差在窗口内、且未发过命令的货物（取偏差绝对值最小者）
+      // dev>0：光电触发晚于应到达时刻（货物早到）；dev<0：货物晚到
       let matched = null;
       let matchedDev = Infinity;
       uploadQueue.trayInfo.forEach((item) => {
         if (item.cmdSent || !item.enqueueTs) return;
-        const dev = Math.abs(now - (item.enqueueTs + travelTime));
-        if (dev <= this.sorterArrivalTolerance && dev < matchedDev) {
+        const dev = now - (item.enqueueTs + travelTime);
+        if (
+          dev >= -this.sorterArrivalToleranceNeg &&
+          dev <= this.sorterArrivalTolerance &&
+          Math.abs(dev) < Math.abs(matchedDev)
+        ) {
           matched = item;
           matchedDev = dev;
         }
       });
       if (!matched) {
         this.addLog(
-          `分拣机${machineNo}光电触发，±${this.sorterArrivalTolerance}ms窗口内未匹配到应到达的货物`
+          `分拣机${machineNo}光电触发，-${this.sorterArrivalToleranceNeg}ms~+${this.sorterArrivalTolerance}ms窗口内未匹配到应到达的货物`
         );
         return;
       }
@@ -2666,7 +2677,7 @@ export default {
         }，1秒后取消）`
       );
     },
-    // X光机剔除：01013光电下降沿后，若有剔除信号，按进队+11s±2s匹配货物并改发12号口
+    // X光机剔除：01013光电下降沿后，若有剔除信号，按进队+11s在正负误差窗口内匹配货物并改发12号口
     handleXrayRejectTrigger() {
       if (this.wcsDockWord16.bit0 !== '1') return;
       const now = Date.now();
@@ -2675,15 +2686,19 @@ export default {
       let matchedDev = Infinity;
       uploadQueue.trayInfo.forEach((item) => {
         if (item.cmdSent || !item.enqueueTs) return;
-        const dev = Math.abs(now - (item.enqueueTs + this.xrayTravelTime));
-        if (dev <= this.sorterArrivalTolerance && dev < matchedDev) {
+        const dev = now - (item.enqueueTs + this.xrayTravelTime);
+        if (
+          dev >= -this.sorterArrivalToleranceNeg &&
+          dev <= this.sorterArrivalTolerance &&
+          Math.abs(dev) < Math.abs(matchedDev)
+        ) {
           matched = item;
           matchedDev = dev;
         }
       });
       if (!matched) {
         this.addLog(
-          `X光机剔除信号触发，±${this.sorterArrivalTolerance}ms窗口内未匹配到应到达X光机的货物`,
+          `X光机剔除信号触发，-${this.sorterArrivalToleranceNeg}ms~+${this.sorterArrivalTolerance}ms窗口内未匹配到应到达X光机的货物`,
           'alarm'
         );
         return;

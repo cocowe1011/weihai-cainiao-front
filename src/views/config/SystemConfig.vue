@@ -37,7 +37,7 @@
           :disabled="!allowEdit"
         >
           <el-divider content-position="left">分拣匹配与超时</el-divider>
-          <el-form-item label="光电应到达误差（秒，±）">
+          <el-form-item label="光电应到达误差-正向（秒）">
             <el-input-number
               v-model="cssConfig.arrivalToleranceSec"
               :min="0.1"
@@ -47,7 +47,21 @@
               controls-position="right"
             />
             <span class="form-hint"
-              >触发分拣机光电后，匹配应到达货物的时间窗口</span
+              >货物早到：光电触发时已超过应到达时刻的允许误差</span
+            >
+          </el-form-item>
+          <!-- 负向误差复用 css_config.speed_two 遗留字段存储，避免加新列 -->
+          <el-form-item label="光电应到达误差-负向（秒）">
+            <el-input-number
+              v-model="cssConfig.speedTwo"
+              :min="0.1"
+              :max="60"
+              :step="0.1"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="form-hint"
+              >货物晚到：光电触发时尚未到应到达时刻的允许误差</span
             >
           </el-form-item>
           <el-form-item label="未进入分拣口清理时间（秒）">
@@ -112,6 +126,7 @@ import { EventBus } from '@/utils/EventBus';
 
 const BIZ_DEFAULTS = {
   arrivalToleranceSec: 2,
+  speedTwo: 2,
   notEnteredTimeoutSec: 4.5,
   cmdNotSentTimeoutSec: 5,
   largePortCapacity: 5,
@@ -169,7 +184,8 @@ export default {
     },
     validateBizFields() {
       const checks = [
-        ['arrivalToleranceSec', '光电应到达误差'],
+        ['arrivalToleranceSec', '光电应到达误差-正向'],
+        ['speedTwo', '光电应到达误差-负向'],
         ['notEnteredTimeoutSec', '未进入分拣口清理时间'],
         ['cmdNotSentTimeoutSec', '未发送分拣命令清理时间'],
         ['largePortCapacity', '大包分拣口容量'],
