@@ -2609,7 +2609,7 @@ export default {
         );
       }
     },
-    // 不进上货队列：给PLC发剔除命令 DBW118=1，保持2秒后取消
+    // 不进上货队列：给PLC发剔除命令 DBW118=1，保持500ms后取消
     rejectScanNotEnqueue(reason) {
       const cmdAdd = 'W_DBW118';
       ipcRenderer.send('writeSingleValueToPLC', cmdAdd, 1);
@@ -2619,9 +2619,9 @@ export default {
       this._plcRejectCancelTimer = setTimeout(() => {
         ipcRenderer.send('cancelWriteToPLC', cmdAdd);
         this._plcRejectCancelTimer = null;
-      }, 2000);
+      }, 500);
       this.addLog(
-        `${reason}，不进入上货队列，已发剔除命令 ${cmdAdd}=1（保持2秒）`,
+        `${reason}，不进入上货队列，已发剔除命令 ${cmdAdd}=1（保持500ms）`,
         'alarm'
       );
     },
