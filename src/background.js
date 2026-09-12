@@ -590,11 +590,11 @@ function conPLC() {
 }
 
 /** PLC IO：同一时刻只允许一次读或一次写 */
-const PLC_IO_CYCLE_MS = 200;
+const PLC_IO_CYCLE_MS = 50;
 let plcIoBusy = false;
 let plcIoPhase = 'read'; // 'read' | 'write'
 let plcIoSchedulerStarted = false;
-/** 写周期计数：每 3 次写翻转一次 W_DBW0（写约 400ms/次 → 心跳约 1.2s） */
+/** 写周期计数：每 3 次写翻转一次 W_DBW0（写约 100ms/次 → 心跳约 300ms） */
 let heartWriteCount = 1;
 let heartValue = 0;
 
