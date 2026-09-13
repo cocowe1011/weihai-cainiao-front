@@ -3560,6 +3560,8 @@ export default {
             // 全线清空后检查并更新DBW100
             this.checkAndWriteDBW100();
             this.nowScanTrayInfo = {};
+            this.sixScanBarcode = '';
+            this.lastProcessedBarcode = '';
             this.lastAllocPortNo = 0; // 分拣口循环下发游标重置，下次从分拣口1开始
             this.runningLogs = []; // 修改为空数组
             this.alarmLogs = []; // 修改为空数组
