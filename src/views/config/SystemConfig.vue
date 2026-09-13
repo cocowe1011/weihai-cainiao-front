@@ -91,6 +91,85 @@
             >
           </el-form-item>
 
+          <el-divider content-position="left">行进时长</el-divider>
+          <el-form-item label="分拣机1行进时间（秒）">
+            <el-input-number
+              v-model="cssConfig.sorter1TravelSec"
+              :min="0.1"
+              :max="180"
+              :step="0.1"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="form-hint">五面扫进队到分拣机1光电</span>
+          </el-form-item>
+          <el-form-item label="分拣机2行进时间（秒）">
+            <el-input-number
+              v-model="cssConfig.sorter2TravelSec"
+              :min="0.1"
+              :max="180"
+              :step="0.1"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="form-hint">五面扫进队到分拣机2光电</span>
+          </el-form-item>
+          <el-form-item label="分拣机3行进时间（秒）">
+            <el-input-number
+              v-model="cssConfig.sorter3TravelSec"
+              :min="0.1"
+              :max="180"
+              :step="0.1"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="form-hint">五面扫进队到分拣机3光电</span>
+          </el-form-item>
+          <el-form-item label="分拣机4行进时间（秒）">
+            <el-input-number
+              v-model="cssConfig.sorter4TravelSec"
+              :min="0.1"
+              :max="180"
+              :step="0.1"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="form-hint">五面扫进队到分拣机4光电</span>
+          </el-form-item>
+          <el-form-item label="分拣机5行进时间（秒）">
+            <el-input-number
+              v-model="cssConfig.sorter5TravelSec"
+              :min="0.1"
+              :max="180"
+              :step="0.1"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="form-hint">五面扫进队到分拣机5光电</span>
+          </el-form-item>
+          <el-form-item label="分拣机6行进时间（秒）">
+            <el-input-number
+              v-model="cssConfig.sorter6TravelSec"
+              :min="0.1"
+              :max="180"
+              :step="0.1"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="form-hint">五面扫进队到分拣机6光电</span>
+          </el-form-item>
+          <el-form-item label="X光机行进时间（秒）">
+            <el-input-number
+              v-model="cssConfig.xrayTravelSec"
+              :min="0.1"
+              :max="180"
+              :step="0.1"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="form-hint">五面扫进队到X光机光电</span>
+          </el-form-item>
+
           <el-divider content-position="left">分拣口容量</el-divider>
           <el-form-item label="大包分拣口容量">
             <el-input-number
@@ -129,6 +208,13 @@ const BIZ_DEFAULTS = {
   speedTwo: 2,
   notEnteredTimeoutSec: 4.5,
   cmdNotSentTimeoutSec: 5,
+  sorter1TravelSec: 19,
+  sorter2TravelSec: 23,
+  sorter3TravelSec: 27,
+  sorter4TravelSec: 30,
+  sorter5TravelSec: 34,
+  sorter6TravelSec: 38,
+  xrayTravelSec: 11,
   largePortCapacity: 5,
   smallPortCapacity: 8
 };
@@ -188,6 +274,13 @@ export default {
         ['speedTwo', '光电应到达误差-负向'],
         ['notEnteredTimeoutSec', '未进入分拣口清理时间'],
         ['cmdNotSentTimeoutSec', '未发送分拣命令清理时间'],
+        ['sorter1TravelSec', '分拣机1行进时间'],
+        ['sorter2TravelSec', '分拣机2行进时间'],
+        ['sorter3TravelSec', '分拣机3行进时间'],
+        ['sorter4TravelSec', '分拣机4行进时间'],
+        ['sorter5TravelSec', '分拣机5行进时间'],
+        ['sorter6TravelSec', '分拣机6行进时间'],
+        ['xrayTravelSec', 'X光机行进时间'],
         ['largePortCapacity', '大包分拣口容量'],
         ['smallPortCapacity', '小包分拣口容量']
       ];

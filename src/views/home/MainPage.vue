@@ -2331,13 +2331,41 @@ export default {
       if (smallCap != null) {
         this.smallPortCapacity = smallCap;
       }
+      const sorter1Ms = toMs(cfg.sorter1TravelSec);
+      if (sorter1Ms != null) {
+        this.sorterTravelTimes[1] = sorter1Ms;
+      }
+      const sorter2Ms = toMs(cfg.sorter2TravelSec);
+      if (sorter2Ms != null) {
+        this.sorterTravelTimes[2] = sorter2Ms;
+      }
+      const sorter3Ms = toMs(cfg.sorter3TravelSec);
+      if (sorter3Ms != null) {
+        this.sorterTravelTimes[3] = sorter3Ms;
+      }
+      const sorter4Ms = toMs(cfg.sorter4TravelSec);
+      if (sorter4Ms != null) {
+        this.sorterTravelTimes[4] = sorter4Ms;
+      }
+      const sorter5Ms = toMs(cfg.sorter5TravelSec);
+      if (sorter5Ms != null) {
+        this.sorterTravelTimes[5] = sorter5Ms;
+      }
+      const sorter6Ms = toMs(cfg.sorter6TravelSec);
+      if (sorter6Ms != null) {
+        this.sorterTravelTimes[6] = sorter6Ms;
+      }
+      const xrayMs = toMs(cfg.xrayTravelSec);
+      if (xrayMs != null) {
+        this.xrayTravelTime = xrayMs;
+      }
     },
     loadBizConfig() {
       HttpUtil.get('/cssConfig/getConfig')
         .then((res) => {
           this.applyBizConfig(res.data);
           this.addLog(
-            `业务配置已刷新：光电误差+${this.sorterArrivalTolerance}/-${this.sorterArrivalToleranceNeg}ms，未进口清理${this.cmdSentTimeoutMs}ms，未发命令清理${this.cmdNotSentOverdueMs}ms，大包容量${this.largePortCapacity}，小包容量${this.smallPortCapacity}`
+            `业务配置已刷新：光电误差+${this.sorterArrivalTolerance}/-${this.sorterArrivalToleranceNeg}ms，未进口清理${this.cmdSentTimeoutMs}ms，未发命令清理${this.cmdNotSentOverdueMs}ms，行进时长分拣机${this.sorterTravelTimes[1]}/${this.sorterTravelTimes[2]}/${this.sorterTravelTimes[3]}/${this.sorterTravelTimes[4]}/${this.sorterTravelTimes[5]}/${this.sorterTravelTimes[6]}ms、X光机${this.xrayTravelTime}ms，大包容量${this.largePortCapacity}，小包容量${this.smallPortCapacity}`
           );
         })
         .catch((err) => {
