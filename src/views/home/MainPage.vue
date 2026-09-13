@@ -2523,7 +2523,7 @@ export default {
       this.handleScanEnqueue(code);
     },
     // 扫码进队入口：DBW1252上升沿触发时拿当前五面扫条码进入上货队列
-    // 正常条码走分配分拣口流程；NoRead/多码/菜鸟失败/分配失败不进队，给PLC发剔除命令
+    // 正常条码走分配分拣口流程；NoRead/多码/重复码/菜鸟失败/分配失败不进队，给PLC发剔除命令
     async handleScanEnqueue(barcode) {
       const code = (barcode || '').trim();
       if (!code) return;
@@ -2539,7 +2539,17 @@ export default {
         return;
       }
 
-      // 正常条码：查包裹信息（停用菜鸟走 mock，否则查菜鸟接口），不做重复检测
+      // 上货队列已有同条码则剔除、不进队
+      const uploadQueue = this.queues[0];
+      const isDuplicate = (uploadQueue.trayInfo || []).some(
+        (item) => (item.packageNo || '').trim() === code
+      );
+      if (isDuplicate) {
+        this.rejectScanNotEnqueue(`条码重复，上货队列已存在同条码（${code}）`);
+        return;
+      }
+
+      // 正常条码：查包裹信息（停用菜鸟走 mock，否则查菜鸟接口）
       const packageInfo = await this.resolvePackageInfo(code);
       if (!packageInfo) {
         this.rejectScanNotEnqueue(`菜鸟大包查询失败（条码 ${code}）`);
@@ -2609,7 +2619,7 @@ export default {
         );
       }
     },
-    // 不进上货队列：给PLC发剔除命令 DBW118=1，保持1秒后取消
+    // 不进上货队列：给PLC发剔除命令 DBW118=1，保持500ms后取消
     rejectScanNotEnqueue(reason) {
       const cmdAdd = 'W_DBW118';
       ipcRenderer.send('writeSingleValueToPLC', cmdAdd, 1);
@@ -2619,9 +2629,9 @@ export default {
       this._plcRejectCancelTimer = setTimeout(() => {
         ipcRenderer.send('cancelWriteToPLC', cmdAdd);
         this._plcRejectCancelTimer = null;
-      }, 1000);
+      }, 500);
       this.addLog(
-        `${reason}，不进入上货队列，已发剔除命令 ${cmdAdd}=1（保持1秒）`,
+        `${reason}，不进入上货队列，已发剔除命令 ${cmdAdd}=1（保持500ms）`,
         'alarm'
       );
     },
