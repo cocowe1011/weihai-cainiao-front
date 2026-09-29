@@ -3406,7 +3406,7 @@ export default {
       }
       try {
         const res = await HttpUtilCainiao.post(
-          '/PreSupervision/getBigPackageToMCS?key=31140fca3b37427491bd3106f765eed2',
+          '/api-intranet/trans/packageData/getBigPackageToMCS',
           { bigPackageCode: barcode }
         );
         const codeOk =
