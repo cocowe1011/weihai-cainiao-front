@@ -36,139 +36,142 @@
           :model="cssConfig"
           :disabled="!allowEdit"
         >
-          <el-divider content-position="left">分拣匹配与超时</el-divider>
-          <el-form-item label="光电应到达误差-正向（秒）">
-            <el-input-number
-              v-model="cssConfig.arrivalToleranceSec"
-              :min="0.1"
-              :max="60"
-              :step="0.1"
-              :precision="1"
-              controls-position="right"
-            />
-            <span class="form-hint"
-              >货物早到：光电触发时已超过应到达时刻的允许误差</span
-            >
-          </el-form-item>
-          <!-- 负向误差复用 css_config.speed_two 遗留字段存储，避免加新列 -->
-          <el-form-item label="光电应到达误差-负向（秒）">
-            <el-input-number
-              v-model="cssConfig.speedTwo"
-              :min="0.1"
-              :max="60"
-              :step="0.1"
-              :precision="1"
-              controls-position="right"
-            />
-            <span class="form-hint"
-              >货物晚到：光电触发时尚未到应到达时刻的允许误差</span
-            >
-          </el-form-item>
-          <el-form-item label="未进入分拣口清理时间（秒）">
-            <el-input-number
-              v-model="cssConfig.notEnteredTimeoutSec"
-              :min="0.1"
-              :max="120"
-              :step="0.1"
-              :precision="1"
-              controls-position="right"
-            />
-            <span class="form-hint"
-              >已发转向命令后仍未进入分拣口，则从上货队列删除</span
-            >
-          </el-form-item>
-          <el-form-item label="未发送分拣命令清理时间（秒）">
-            <el-input-number
-              v-model="cssConfig.cmdNotSentTimeoutSec"
-              :min="0.1"
-              :max="120"
-              :step="0.1"
-              :precision="1"
-              controls-position="right"
-            />
-            <span class="form-hint"
-              >超过应到达时刻后再等待该时长，仍未发命令则删除</span
-            >
-          </el-form-item>
+          <!-- 已回退到计时版本之前的逻辑，以下计时类配置暂时隐藏（保留代码便于后续恢复） -->
+          <template v-if="false">
+            <el-divider content-position="left">分拣匹配与超时</el-divider>
+            <el-form-item label="光电应到达误差-正向（秒）">
+              <el-input-number
+                v-model="cssConfig.arrivalToleranceSec"
+                :min="0.1"
+                :max="60"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+              />
+              <span class="form-hint"
+                >货物早到：光电触发时已超过应到达时刻的允许误差</span
+              >
+            </el-form-item>
+            <!-- 负向误差复用 css_config.speed_two 遗留字段存储，避免加新列 -->
+            <el-form-item label="光电应到达误差-负向（秒）">
+              <el-input-number
+                v-model="cssConfig.speedTwo"
+                :min="0.1"
+                :max="60"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+              />
+              <span class="form-hint"
+                >货物晚到：光电触发时尚未到应到达时刻的允许误差</span
+              >
+            </el-form-item>
+            <el-form-item label="未进入分拣口清理时间（秒）">
+              <el-input-number
+                v-model="cssConfig.notEnteredTimeoutSec"
+                :min="0.1"
+                :max="120"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+              />
+              <span class="form-hint"
+                >已发转向命令后仍未进入分拣口，则从上货队列删除</span
+              >
+            </el-form-item>
+            <el-form-item label="未发送分拣命令清理时间（秒）">
+              <el-input-number
+                v-model="cssConfig.cmdNotSentTimeoutSec"
+                :min="0.1"
+                :max="120"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+              />
+              <span class="form-hint"
+                >超过应到达时刻后再等待该时长，仍未发命令则删除</span
+              >
+            </el-form-item>
 
-          <el-divider content-position="left">行进时长</el-divider>
-          <el-form-item label="分拣机1行进时间（秒）">
-            <el-input-number
-              v-model="cssConfig.sorter1TravelSec"
-              :min="0.1"
-              :max="180"
-              :step="0.1"
-              :precision="1"
-              controls-position="right"
-            />
-            <span class="form-hint">五面扫进队到分拣机1光电</span>
-          </el-form-item>
-          <el-form-item label="分拣机2行进时间（秒）">
-            <el-input-number
-              v-model="cssConfig.sorter2TravelSec"
-              :min="0.1"
-              :max="180"
-              :step="0.1"
-              :precision="1"
-              controls-position="right"
-            />
-            <span class="form-hint">五面扫进队到分拣机2光电</span>
-          </el-form-item>
-          <el-form-item label="分拣机3行进时间（秒）">
-            <el-input-number
-              v-model="cssConfig.sorter3TravelSec"
-              :min="0.1"
-              :max="180"
-              :step="0.1"
-              :precision="1"
-              controls-position="right"
-            />
-            <span class="form-hint">五面扫进队到分拣机3光电</span>
-          </el-form-item>
-          <el-form-item label="分拣机4行进时间（秒）">
-            <el-input-number
-              v-model="cssConfig.sorter4TravelSec"
-              :min="0.1"
-              :max="180"
-              :step="0.1"
-              :precision="1"
-              controls-position="right"
-            />
-            <span class="form-hint">五面扫进队到分拣机4光电</span>
-          </el-form-item>
-          <el-form-item label="分拣机5行进时间（秒）">
-            <el-input-number
-              v-model="cssConfig.sorter5TravelSec"
-              :min="0.1"
-              :max="180"
-              :step="0.1"
-              :precision="1"
-              controls-position="right"
-            />
-            <span class="form-hint">五面扫进队到分拣机5光电</span>
-          </el-form-item>
-          <el-form-item label="分拣机6行进时间（秒）">
-            <el-input-number
-              v-model="cssConfig.sorter6TravelSec"
-              :min="0.1"
-              :max="180"
-              :step="0.1"
-              :precision="1"
-              controls-position="right"
-            />
-            <span class="form-hint">五面扫进队到分拣机6光电</span>
-          </el-form-item>
-          <el-form-item label="X光机行进时间（秒）">
-            <el-input-number
-              v-model="cssConfig.xrayTravelSec"
-              :min="0.1"
-              :max="180"
-              :step="0.1"
-              :precision="1"
-              controls-position="right"
-            />
-            <span class="form-hint">五面扫进队到X光机光电</span>
-          </el-form-item>
+            <el-divider content-position="left">行进时长</el-divider>
+            <el-form-item label="分拣机1行进时间（秒）">
+              <el-input-number
+                v-model="cssConfig.sorter1TravelSec"
+                :min="0.1"
+                :max="180"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+              />
+              <span class="form-hint">五面扫进队到分拣机1光电</span>
+            </el-form-item>
+            <el-form-item label="分拣机2行进时间（秒）">
+              <el-input-number
+                v-model="cssConfig.sorter2TravelSec"
+                :min="0.1"
+                :max="180"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+              />
+              <span class="form-hint">五面扫进队到分拣机2光电</span>
+            </el-form-item>
+            <el-form-item label="分拣机3行进时间（秒）">
+              <el-input-number
+                v-model="cssConfig.sorter3TravelSec"
+                :min="0.1"
+                :max="180"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+              />
+              <span class="form-hint">五面扫进队到分拣机3光电</span>
+            </el-form-item>
+            <el-form-item label="分拣机4行进时间（秒）">
+              <el-input-number
+                v-model="cssConfig.sorter4TravelSec"
+                :min="0.1"
+                :max="180"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+              />
+              <span class="form-hint">五面扫进队到分拣机4光电</span>
+            </el-form-item>
+            <el-form-item label="分拣机5行进时间（秒）">
+              <el-input-number
+                v-model="cssConfig.sorter5TravelSec"
+                :min="0.1"
+                :max="180"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+              />
+              <span class="form-hint">五面扫进队到分拣机5光电</span>
+            </el-form-item>
+            <el-form-item label="分拣机6行进时间（秒）">
+              <el-input-number
+                v-model="cssConfig.sorter6TravelSec"
+                :min="0.1"
+                :max="180"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+              />
+              <span class="form-hint">五面扫进队到分拣机6光电</span>
+            </el-form-item>
+            <el-form-item label="X光机行进时间（秒）">
+              <el-input-number
+                v-model="cssConfig.xrayTravelSec"
+                :min="0.1"
+                :max="180"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+              />
+              <span class="form-hint">五面扫进队到X光机光电</span>
+            </el-form-item>
+          </template>
 
           <el-divider content-position="left">分拣口容量</el-divider>
           <el-form-item label="大包分拣口容量">
@@ -193,6 +196,19 @@
             />
             <span class="form-hint">1~11 号通用口，小包占用上限</span>
           </el-form-item>
+
+          <el-divider content-position="left">扫码模式</el-divider>
+          <!-- 扫码模式复用 css_config.judge_load_point 遗留字段存储，避免加新列 -->
+          <el-form-item label="扫码模式">
+            <el-select
+              v-model="cssConfig.judgeLoadPoint"
+              placeholder="请选择扫码模式"
+            >
+              <el-option :value="1" label="五面扫扫码模式" />
+              <el-option :value="2" label="PDA扫码模式" />
+            </el-select>
+            <span class="form-hint">选择读码上货使用的扫码方式</span>
+          </el-form-item>
         </el-form>
       </div>
     </div>
@@ -204,19 +220,10 @@ import HttpUtil from '@/utils/HttpUtil';
 import { EventBus } from '@/utils/EventBus';
 
 const BIZ_DEFAULTS = {
-  arrivalToleranceSec: 2,
-  speedTwo: 2,
-  notEnteredTimeoutSec: 4.5,
-  cmdNotSentTimeoutSec: 5,
-  sorter1TravelSec: 19,
-  sorter2TravelSec: 23,
-  sorter3TravelSec: 27,
-  sorter4TravelSec: 30,
-  sorter5TravelSec: 34,
-  sorter6TravelSec: 38,
-  xrayTravelSec: 11,
   largePortCapacity: 5,
-  smallPortCapacity: 8
+  smallPortCapacity: 8,
+  // 扫码模式（复用 judge_load_point）：1=五面扫，2=PDA
+  judgeLoadPoint: 1
 };
 
 export default {
@@ -270,17 +277,6 @@ export default {
     },
     validateBizFields() {
       const checks = [
-        ['arrivalToleranceSec', '光电应到达误差-正向'],
-        ['speedTwo', '光电应到达误差-负向'],
-        ['notEnteredTimeoutSec', '未进入分拣口清理时间'],
-        ['cmdNotSentTimeoutSec', '未发送分拣命令清理时间'],
-        ['sorter1TravelSec', '分拣机1行进时间'],
-        ['sorter2TravelSec', '分拣机2行进时间'],
-        ['sorter3TravelSec', '分拣机3行进时间'],
-        ['sorter4TravelSec', '分拣机4行进时间'],
-        ['sorter5TravelSec', '分拣机5行进时间'],
-        ['sorter6TravelSec', '分拣机6行进时间'],
-        ['xrayTravelSec', 'X光机行进时间'],
         ['largePortCapacity', '大包分拣口容量'],
         ['smallPortCapacity', '小包分拣口容量']
       ];
@@ -394,6 +390,10 @@ export default {
       }
 
       :deep(.el-input-number) {
+        width: 180px;
+      }
+
+      :deep(.el-select) {
         width: 180px;
       }
 
