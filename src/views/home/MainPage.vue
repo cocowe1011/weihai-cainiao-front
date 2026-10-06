@@ -90,6 +90,7 @@
               <el-icon><Delete /></el-icon><span>全线清空</span>
             </button>
             <button
+              v-if="scanMode !== 2"
               class="btn-disable-cainiao"
               @click="toggleDisableCainiao"
               :class="{ pressed: disableCainiao }"
@@ -192,7 +193,7 @@
                 />
                 <!-- 修改队列标识 -->
                 <div
-                  v-for="marker in queueMarkers"
+                  v-for="marker in visibleQueueMarkers"
                   :key="marker.id"
                   class="queue-marker"
                   :class="getQueueMarkerClass(marker.queueId)"
@@ -1016,8 +1017,13 @@
                     class="conveyor-arrow-item"
                   ></div>
                 </div>
-                <!-- 六面扫扫码上货面板 -->
-                <div class="marker-with-panel" data-x="1150" data-y="1200">
+                <!-- 六面扫扫码上货面板（PDA扫码模式下屏蔽） -->
+                <div
+                  v-if="scanMode !== 2"
+                  class="marker-with-panel"
+                  data-x="1150"
+                  data-y="1200"
+                >
                   <div
                     class="data-panel"
                     :class="['position-top', { 'always-show': true }]"
@@ -1226,7 +1232,7 @@
             <!-- 左侧队列列表 -->
             <div class="queue-container-left">
               <div
-                v-for="(queue, queuesIndex) in queues"
+                v-for="(queue, queuesIndex) in visibleQueues"
                 :key="'queue-' + queue.id + '-' + queuesIndex"
                 class="queue"
                 :class="{ active: selectedQueueIndex === queue.id - 1 }"
@@ -1273,7 +1279,16 @@
             <!-- 右侧托盘列表 -->
             <div class="queue-container-right">
               <div class="selected-queue-header" v-if="selectedQueue">
-                <h3>{{ selectedQueue.queueName }}</h3>
+                <h3>
+                  {{ selectedQueue.queueName }}
+                  <el-tag
+                    v-if="isPdaQueueSelected"
+                    size="small"
+                    type="info"
+                    style="margin-left: 8px"
+                    >仅查看</el-tag
+                  >
+                </h3>
                 <div class="queue-header-actions">
                   <span class="tray-total"
                     >包裹数量: {{ selectedQueue.trayInfo?.length || 0 }}</span
@@ -1289,7 +1304,7 @@
                     :class="{
                       dragging: isDragging && draggedTray?.id === tray.id
                     }"
-                    draggable="true"
+                    :draggable="!isPdaQueueSelected"
                     @dragstart="
                       handleDragStart($event, tray, selectedQueueIndex)
                     "
@@ -1324,7 +1339,7 @@
                       </div>
                       <span class="tray-time">{{ tray.time }}</span>
                     </div>
-                    <div class="tray-actions">
+                    <div class="tray-actions" v-if="!isPdaQueueSelected">
                       <el-button
                         type="primary"
                         size="small"
@@ -1390,6 +1405,28 @@
                   class="qrcode-input"
                 ></el-input>
               </div>
+            </div>
+          </div>
+          <!-- PDA扫码队列模拟 -->
+          <div class="test-section">
+            <span class="test-label">PDA队列测试:</span>
+            <div class="qrcode-test-container">
+              <el-button
+                type="primary"
+                size="small"
+                :loading="pdaQueueTestBusy"
+                @click="mockPdaQueueScan"
+              >
+                PDA队列模拟扫码
+              </el-button>
+              <el-button
+                type="danger"
+                size="small"
+                :loading="pdaQueueTestBusy"
+                @click="clearPdaQueue"
+              >
+                清空PDA队列
+              </el-button>
             </div>
           </div>
           <!-- PLC信号手动触发 -->
@@ -1811,6 +1848,7 @@ export default {
         }
       ],
       showTestPanel: false,
+      pdaQueueTestBusy: false,
       orderQueryDialogVisible: false,
       buttonStates: {
         start: false,
@@ -1936,6 +1974,12 @@ export default {
           id: 16,
           queueName: '剔除口',
           trayInfo: []
+        },
+        {
+          // PDA扫码队列：仅PDA扫码模式（scanMode=2）展示，数据由PDA端写入、后端queue_info(id=17)同步
+          id: 17,
+          queueName: 'PDA扫码',
+          trayInfo: []
         }
       ],
       // 添加队列位置标识数据
@@ -1955,7 +1999,9 @@ export default {
         { id: 13, name: '分拣口12', queueId: 13, x: 2650, y: 1020 },
         { id: 14, name: '分拣口13', queueId: 14, x: 2820, y: 1350 },
         { id: 15, name: '1010', queueId: 15, x: 1200, y: 1480 },
-        { id: 16, name: '剔除口', queueId: 16, x: 850, y: 1210 }
+        { id: 16, name: '剔除口', queueId: 16, x: 850, y: 1210 },
+        // PDA扫码队列标记：位于1008(650,780)左上方作为人工上货入口，坐标可按实际平面图微调
+        { id: 17, name: 'PDA扫码', queueId: 17, x: 780, y: 620 }
       ],
       // 输送线流动箭头配置（坐标按平面图调整）
       conveyorArrows: [
@@ -2186,6 +2232,18 @@ export default {
     };
   },
   computed: {
+    // 队列列表展示过滤：PDA扫码队列(id=17)仅在PDA扫码模式下展示
+    visibleQueues() {
+      return this.scanMode === 2
+        ? this.queues
+        : this.queues.filter((q) => q.id !== 17);
+    },
+    // 平面图标记展示过滤：PDA扫码标记(queueId=17)仅在PDA扫码模式下展示，与visibleQueues一致
+    visibleQueueMarkers() {
+      return this.scanMode === 2
+        ? this.queueMarkers
+        : this.queueMarkers.filter((m) => m.queueId !== 17);
+    },
     currentLogs() {
       return this.activeLogType === 'running'
         ? this.runningLogs
@@ -2196,6 +2254,10 @@ export default {
     },
     selectedQueue() {
       return this.queues[this.selectedQueueIndex];
+    },
+    // 当前选中的是否为PDA扫码队列(id=17)：WCS端仅供查看，禁止删除/排序/拖拽
+    isPdaQueueSelected() {
+      return !!this.selectedQueue && this.selectedQueue.id === 17;
     },
     sortPortPurchaseIds() {
       return {
@@ -2332,6 +2394,18 @@ export default {
     'sortPortPlcCounts.13'(newVal) {
       if (!this.isDataReady) return;
       this.onExceptionPortPlcCount(13, newVal);
+    },
+    // 扫码模式切换：PDA模式(2)断开六面扫Socket并屏蔽面板；切回五面扫(1)重新连接
+    scanMode() {
+      this.refreshSixScanByMode();
+      // 标记DOM随模式增减后，重新按data-x/data-y定位，避免新增的PDA扫码标记落在(0,0)
+      this.$nextTick(() => {
+        this.updateMarkerPositions();
+      });
+      // 切到PDA模式立即同步一次PDA扫码队列展示（不必等轮询）
+      if (this.scanMode === 2) {
+        this.syncPdaQueue();
+      }
     }
   },
   mounted() {
@@ -2348,6 +2422,8 @@ export default {
     this._queueInitDone = false; // 初始化标记，跳过首次赋值触发的watch
     this.$nextTick(() => {
       this.queues.forEach((queue, index) => {
+        // PDA扫码队列(id=17)不注册回写watcher：PC端只读展示+显式回写，避免轮询同步触发watcher覆盖PDA端修改
+        if (queue.id === 17) return;
         const unwatch = this.$watch(`queues.${index}`, {
           handler(newVal, oldVal) {
             if (!this._queueInitDone) return;
@@ -2360,8 +2436,7 @@ export default {
     });
     // 启动 MCS/AGV 队列状态轮询
     this.startMcsPolling();
-    // 六面扫TCP直连（不再通过background.js中转）
-    this.connectSixScan();
+    // 六面扫TCP直连在业务配置加载完成后按扫码模式决定（见loadBizConfig），此处不再无条件连接
     // 保存监听器引用，以便组件销毁时移除，避免重复注册和内存泄漏
     this.receivedMsgHandler = (event, values, values2) => {
       const getBit = (word, bitIndex) => ((word >> bitIndex) & 1).toString();
@@ -2579,10 +2654,26 @@ export default {
               this.smallPortCapacity
             }，扫码模式${this.scanMode === 2 ? 'PDA扫码' : '五面扫扫码'}`
           );
+          // 根据扫码模式决定六面扫Socket连接（PDA模式不连接）
+          this.refreshSixScanByMode();
         })
         .catch((err) => {
           console.log('biz config load error!', err);
+          // 配置加载失败：默认五面扫模式，保证六面扫Socket连接
+          this.refreshSixScanByMode();
         });
+    },
+    // 根据当前扫码模式刷新六面扫Socket连接：PDA模式(2)断开，五面扫模式未连接时建立
+    refreshSixScanByMode() {
+      if (this.scanMode === 2) {
+        if (this._sixScanSocket || !this._sixScanDestroyed) {
+          this.disconnectSixScan();
+          this.sixScanSocketConnected = false;
+          this.addLog('PDA扫码模式，六面扫Socket已断开/屏蔽');
+        }
+      } else if (!this._sixScanSocket) {
+        this.connectSixScan();
+      }
     },
     buildTwinPayload() {
       const motors = [];
@@ -2740,6 +2831,8 @@ export default {
     },
     // 处理六面扫Socket发来的条码数据
     handleSixScanSocketData(rawBarcode) {
+      // PDA扫码模式下屏蔽六面扫数据（防止残留连接污染）
+      if (this.scanMode === 2) return;
       const rawStr = (rawBarcode || '').trim();
       // 始终显示原始数据到面板（去掉首尾方括号），由 watch 统一判断
       this.lastProcessedBarcode = rawStr.replace(/^\[|\]$/g, '');
@@ -2761,6 +2854,11 @@ export default {
     // 目的地请求处理入口（DBW16.bit0上升沿触发）
     // 不再依赖 sixScanBarcode watch 缓存，直接拿当前条码进行判断和mock处理
     async handleDestinationRequest() {
+      // PDA扫码模式：不依赖六面扫条码，从PDA扫码队列(id=17)取队头处理
+      if (this.scanMode === 2) {
+        await this.handlePdaDestinationRequest();
+        return;
+      }
       const barcode = (this.sixScanBarcode || '').trim();
 
       // 1. 条码为空
@@ -2855,6 +2953,10 @@ export default {
         return;
       }
       this.nowScanTrayInfo = packageInfo;
+      await this.allocateAndDispatch(packageInfo, barcode);
+    },
+    // 分配分拣口并下发：写PLC目的地/虚拟ID → 保存订单 → 入1008队列（五面扫与PDA扫码模式共用，统一在下发时落库）
+    async allocateAndDispatch(packageInfo, barcode) {
       const packageSize = packageInfo.packageSize;
       try {
         // 1. 分配分拣口（1~11循环；同口仅允许同渠道、同大小包裹）
@@ -2871,7 +2973,7 @@ export default {
             }），已写目的地999，条码：${barcode}`,
             'alarm'
           );
-          return;
+          return false;
         }
 
         // 2. 计算该分拣口当前负载（分拣口队列中 + 1008队列中已分配该口的 + 1010队列中已分配该口的）
@@ -2920,17 +3022,18 @@ export default {
           }，目的地编码：${destinationCode},已写入目的地编码：${destinationCode}，已写入虚拟ID（条码）：${barcode},分拣口当前包裹数量：${portQueueCount}，1008队列包裹数量：${q1008Count}，1010队列包裹数量：${q1010Count}`
         );
 
-        // 7. 保存订单到 order_info
+        // 7. 保存订单到 order_info（五面扫与PDA统一在下发时落库）
         const payload = toOrderInfoPayload(packageInfo);
         const res = await HttpUtil.post('/order_info/save', payload);
         const savedOrder = res && res.data;
         if (!savedOrder || savedOrder.id == null) {
           throw new Error((res && res.message) || '保存订单失败');
         }
+        const orderInfoId = savedOrder.id;
 
         // 8. 构建队列项，加入1008队列（queues[0]）
         const queueItem = {
-          orderInfoId: savedOrder.id,
+          orderInfoId: orderInfoId,
           packageNo: packageInfo.packageNo,
           trayTime: moment().format('YYYY-MM-DD HH:mm:ss'),
           channel: packageInfo.channel,
@@ -2954,6 +3057,7 @@ export default {
         this.$message.success(
           `大包 ${packageInfo.packageNo} 已分配至分拣口${port.portNo}`
         );
+        return true;
       } catch (error) {
         console.error('目的地请求处理失败:', error);
         this.$message.error(`目的地请求处理失败：${error.message || '请重试'}`);
@@ -2962,7 +3066,109 @@ export default {
             error.message || '请重试'
           }`
         );
+        return false;
       }
+    },
+    // PDA扫码模式目的地请求：实时取PDA扫码队列(id=17)队头，分配下发后出队
+    async handlePdaDestinationRequest() {
+      const write999 = () => {
+        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
+        setTimeout(() => {
+          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+        }, 1000);
+      };
+      // 1. 查看队头（pda_scan_queue 明细表，不删除）
+      let head = null;
+      try {
+        const res = await HttpUtil.get('/pda_queue/peekHead');
+        head = res && res.data ? res.data : null;
+      } catch (error) {
+        write999();
+        this.addLog(
+          `PDA扫码队列查询失败，已写目的地999，原因：${
+            error.message || '网络错误'
+          }`,
+          'alarm'
+        );
+        return;
+      }
+
+      // 2. 队列为空：写999报警
+      if (!head) {
+        write999();
+        this.addLog(
+          '收到目的地请求信号，但PDA扫码队列为空，已写目的地999',
+          'alarm'
+        );
+        this.$message.error('PDA扫码队列为空，已发送999');
+        return;
+      }
+
+      // 3. 取队头构造包裹信息（PDA入队时已完成菜鸟查询与落库）
+      const barcode = (head.packageNo || '').trim();
+      if (!barcode) {
+        write999();
+        this.addLog('PDA扫码队列队头缺少大包号，已写目的地999', 'alarm');
+        return;
+      }
+      const packageInfo = {
+        packageNo: barcode,
+        packageSize: head.packageSize || 'small',
+        channel: head.channel || '',
+        packingWeight: head.packingWeight || '',
+        expectedQty: head.expectedQty || '',
+        chargeWeight: head.chargeWeight || '',
+        actualQty: head.expectedQty || '',
+        customerSource: '',
+        packageCreateTime: '',
+        sourceWarehouse: '',
+        packageStatus: '',
+        destinationCountry: '',
+        departurePort: '',
+        destinationPort: '',
+        mblNo: '',
+        subBillNo: '',
+        businessNo: '',
+        containerNo: '',
+        sealNo: '',
+        packingTime: '',
+        packer: '',
+        handoverTime: '',
+        handoverPerson: '',
+        customsPort: '',
+        billReceiver: '',
+        batchNo: '',
+        plateNo: '',
+        barcode: barcode
+      };
+      this.nowScanTrayInfo = packageInfo;
+      this.addLog(`PDA扫码模式目的地请求：取队头大包 ${barcode}`);
+
+      // 4. 分配分拣口并下发（与五面扫完全一致：下发时save order_info）
+      const dispatched = await this.allocateAndDispatch(packageInfo, barcode);
+      if (!dispatched) {
+        // 分配/下发失败：队头保留在PDA扫码队列，等待下一次目的地请求重试
+        this.addLog(
+          `PDA扫码队头 ${barcode} 分配下发失败，保留在PDA扫码队列中`,
+          'alarm'
+        );
+        return;
+      }
+
+      // 5. 下发成功后按主键行级删除队头（只删这一行，不影响PDA端并发写入的其他包裹）
+      try {
+        await HttpUtil.post('/pda_queue/removeById', null, {
+          params: { id: head.id }
+        });
+        this.addLog(`大包 ${barcode} 已从PDA扫码队列出队`);
+      } catch (error) {
+        this.addLog(
+          `PDA扫码队列出队删除失败：${error.message || '网络错误'}`,
+          'alarm'
+        );
+      }
+      // 刷新本地展示（重新拉取明细表）
+      this.syncPdaQueue();
     },
     // M1008虚拟ID变化处理：包裹到达M1008工位，设置1008队列中对应包裹的isInQueue=1
     handleM1008Change(virtualId) {
@@ -3441,6 +3647,8 @@ export default {
             const queueId = queueData.id;
             const queueIndex = queueId - 1;
             if (queueIndex < 1 || queueIndex >= this.queues.length) return; // 跳过1008队列(id=1)
+            // PDA扫码队列(id=17)不参与AGV/分拣口状态处理，已迁至pda_scan_queue明细表，由syncPdaQueue单独同步
+            if (queueId === 17) return;
             const queue = this.queues[queueIndex];
             const dbTrayStatus = queueData.trayStatus || '';
             const dbIsLock = queueData.isLock || '';
@@ -3473,10 +3681,37 @@ export default {
           });
           // 数据库状态同步后检查并更新DBW100
           this.checkAndWriteDBW100();
+          // PDA扫码模式：从明细表同步PDA扫码队列，PDA端的增删排序变化在PC端展示
+          if (this.scanMode === 2) {
+            this.syncPdaQueue();
+          }
         })
         .catch((err) => {
           console.error('轮询队列AGV状态失败:', err);
         });
+    },
+    // 从 pda_scan_queue 明细表同步PDA扫码队列到本地展示（queues[16]，id=17仅作展示容器）
+    async syncPdaQueue() {
+      try {
+        const res = await HttpUtil.get('/pda_queue/list');
+        const list = (res && res.data) || [];
+        this.queues[16].trayInfo = list.map((it) => ({
+          pdaQueueId: it.id, // 明细表主键（雪花ID字符串），用于行级删除/排序
+          orderInfoId: it.orderInfoId,
+          packageNo: it.packageNo,
+          trayTime: it.scanTime,
+          channel: it.channel,
+          packageSize: it.packageSize,
+          packingWeight: it.packingWeight,
+          expectedQty: it.expectedQty,
+          trayStatus: '1'
+        }));
+        if (this.selectedQueueIndex === 16) {
+          this.showTrays(16);
+        }
+      } catch (error) {
+        console.error('同步PDA扫码队列失败:', error);
+      }
     },
     // 解除PLC某分拣口的禁止进货命令：先发true（1秒），再发false（2秒），最后取消写入
     clearPlcForbidPort(queueIndex) {
@@ -3631,6 +3866,152 @@ export default {
         }
       }
       return null;
+    },
+    // 生成不重复的模拟大包条码（LP + 14位数字）
+    randomMockBarcode(used) {
+      let code = '';
+      do {
+        let body = '';
+        for (let i = 0; i < 14; i++) {
+          body += Math.floor(Math.random() * 10);
+        }
+        code = `LP${body}`;
+      } while (used.has(code));
+      used.add(code);
+      return code;
+    },
+    // PDA队列模拟扫码：填写数量后，随机条码 + mock 包裹信息逐条入队
+    mockPdaQueueScan() {
+      if (this.pdaQueueTestBusy) return;
+      this.$prompt('请输入本次要模拟入队的包裹数量', 'PDA队列模拟扫码', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputValue: '5',
+        inputPattern: /^[1-9]\d{0,2}$/,
+        inputErrorMessage: '请输入 1～999 的正整数'
+      })
+        .then(({ value }) => {
+          const count = Number(value);
+          if (!Number.isInteger(count) || count < 1 || count > 999) {
+            this.$message.warning('请输入 1～999 的正整数');
+            return;
+          }
+          this.pushMockPdaPackages(count);
+        })
+        .catch(() => {});
+    },
+    async pushMockPdaPackages(count) {
+      this.pdaQueueTestBusy = true;
+      const loading = this.$loading({
+        lock: true,
+        text: `正在模拟入队 0/${count}`,
+        background: 'rgba(0, 0, 0, 0.35)'
+      });
+      const used = new Set();
+      try {
+        const existRes = await HttpUtil.get('/pda_queue/list');
+        const existList = (existRes && existRes.data) || [];
+        existList.forEach((it) => {
+          const no = (it.packageNo || '').trim();
+          if (no) used.add(no);
+        });
+      } catch (error) {
+        console.error('查询PDA队列失败:', error);
+      }
+      let ok = 0;
+      let fail = 0;
+      try {
+        for (let i = 0; i < count; i++) {
+          const barcode = this.randomMockBarcode(used);
+          const pkg = mockPackageByBarcode(barcode);
+          try {
+            const res = await HttpUtil.post('/pda_queue/push', {
+              packageNo: pkg.packageNo,
+              channel: pkg.channel,
+              packageSize: pkg.packageSize,
+              chargeWeight: pkg.chargeWeight,
+              packingWeight: pkg.packingWeight,
+              expectedQty: pkg.expectedQty
+            });
+            if (res && (res.code === '200' || res.success === true)) {
+              ok++;
+            } else {
+              fail++;
+            }
+          } catch (error) {
+            fail++;
+            console.error('PDA模拟入队失败:', error);
+          }
+          loading.setText(`正在模拟入队 ${i + 1}/${count}`);
+        }
+        await this.syncPdaQueue();
+        this.addLog(`PDA队列模拟扫码：成功入队 ${ok} 件，失败 ${fail} 件`);
+        if (fail) {
+          this.$message.warning(`模拟入队完成：成功 ${ok} 件，失败 ${fail} 件`);
+        } else {
+          this.$message.success(`已模拟入队 ${ok} 件包裹`);
+        }
+      } finally {
+        loading.close();
+        this.pdaQueueTestBusy = false;
+      }
+    },
+    // 清空 pda_scan_queue 全部明细
+    async clearPdaQueue() {
+      if (this.pdaQueueTestBusy) return;
+      try {
+        await this.$confirm(
+          '确定清空 PDA 扫码队列中的全部包裹吗？',
+          '清空PDA队列',
+          {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }
+        );
+      } catch (e) {
+        return;
+      }
+      this.pdaQueueTestBusy = true;
+      const loading = this.$loading({
+        lock: true,
+        text: '正在清空PDA队列',
+        background: 'rgba(0, 0, 0, 0.35)'
+      });
+      try {
+        const res = await HttpUtil.get('/pda_queue/list');
+        const list = (res && res.data) || [];
+        if (!list.length) {
+          this.$message.info('PDA队列已为空');
+          return;
+        }
+        let fail = 0;
+        for (let i = 0; i < list.length; i++) {
+          const it = list[i];
+          try {
+            await HttpUtil.post('/pda_queue/removeById', null, {
+              params: { id: it.id }
+            });
+          } catch (error) {
+            fail++;
+            console.error('删除PDA队列行失败:', error);
+          }
+          loading.setText(`正在清空 ${i + 1}/${list.length}`);
+        }
+        await this.syncPdaQueue();
+        this.addLog(`清空PDA队列：共 ${list.length} 条，失败 ${fail} 条`);
+        if (fail) {
+          this.$message.warning(`已处理 ${list.length} 条，${fail} 条删除失败`);
+        } else {
+          this.$message.success(`已清空 ${list.length} 条PDA队列数据`);
+        }
+      } catch (error) {
+        this.$message.error(`清空失败：${error.message || '网络错误'}`);
+        this.addLog(`清空PDA队列失败：${error.message || '网络错误'}`, 'alarm');
+      } finally {
+        loading.close();
+        this.pdaQueueTestBusy = false;
+      }
     },
     // 手动模拟 DBW16.bit0 上升沿信号（测试用）
     triggerDestinationRequest() {
@@ -4006,6 +4387,12 @@ export default {
         return;
       }
 
+      // PDA扫码队列(id=17)在WCS端仅供查看，禁止拖入/拖出
+      if (targetQueue.id === 17 || sourceQueue.id === 17) {
+        this.$message.warning('PDA扫码队列在WCS端仅供查看，不能操作');
+        return;
+      }
+
       sourceQueue.trayInfo = Array.isArray(sourceQueue.trayInfo)
         ? sourceQueue.trayInfo
         : [];
@@ -4353,6 +4740,9 @@ export default {
             res.data.forEach((queueData) => {
               const queueId = queueData.id;
               const queueIndex = queueId - 1; // 数组索引从0开始，队列ID从1开始
+
+              // PDA扫码队列(id=17)已迁移至 pda_scan_queue 明细表，不再从 queue_info 加载
+              if (queueId === 17) return;
 
               // 确保队列索引有效
               if (queueIndex >= 0 && queueIndex < this.queues.length) {
