@@ -43,6 +43,14 @@
                   </div>
                 </div>
               </div>
+              <div class="data-card data-card--today">
+                <div class="data-card-border">
+                  <div class="data-card-border-borderTop">上货数量</div>
+                  <div class="data-card-border-borderDown">
+                    {{ todayLoadCount }}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1737,6 +1745,12 @@ import {
 } from '@/utils/packageMockData';
 
 const net = require('net');
+const fs = require('fs');
+const path = require('path');
+
+// 今日上货计数（与缩放配置同目录，升级不覆盖）
+const TODAY_LOAD_DIR = 'D://weihai-cainiao-front/config';
+const TODAY_LOAD_FILE = path.join(TODAY_LOAD_DIR, 'today-load.json');
 
 // 六面扫TCP连接配置
 const SIX_SCAN_HOST = '192.168.4.227';
@@ -1751,6 +1765,7 @@ export default {
   data() {
     return {
       nowScanTrayInfo: {},
+      todayLoadCount: 0,
       sixScanBarcode: '',
       lastProcessedBarcode: '',
       sixScanProcessing: false,
@@ -2409,6 +2424,7 @@ export default {
     }
   },
   mounted() {
+    this.loadTodayLoadCount();
     this.initializeMarkers();
     // 加载业务配置（分拣口容量、扫码模式）并监听配置页刷新事件
     this.loadBizConfig();
@@ -2623,6 +2639,76 @@ export default {
     }, 3000);
   },
   methods: {
+    todayLoadDate() {
+      return moment().format('YYYY-MM-DD');
+    },
+    // 读取今日上货文件。日期不是今天、文件缺失或内容损坏时返回 null
+    readTodayLoadFile() {
+      try {
+        if (!fs.existsSync(TODAY_LOAD_FILE)) return null;
+        const raw = JSON.parse(fs.readFileSync(TODAY_LOAD_FILE, 'utf-8'));
+        const count = Number(raw && raw.count);
+        if (
+          !raw ||
+          raw.date !== this.todayLoadDate() ||
+          !Number.isFinite(count) ||
+          count < 0
+        ) {
+          return null;
+        }
+        return Math.floor(count);
+      } catch (error) {
+        console.error('读取今日上货统计失败:', error);
+        return null;
+      }
+    },
+    writeTodayLoadFile(count) {
+      const payload = {
+        date: this.todayLoadDate(),
+        count
+      };
+      if (!fs.existsSync(TODAY_LOAD_DIR)) {
+        fs.mkdirSync(TODAY_LOAD_DIR, { recursive: true });
+      }
+      fs.writeFileSync(
+        TODAY_LOAD_FILE,
+        JSON.stringify(payload, null, 2),
+        'utf-8'
+      );
+    },
+    loadTodayLoadCount() {
+      const count = this.readTodayLoadFile();
+      if (count == null) {
+        try {
+          this.writeTodayLoadFile(0);
+        } catch (error) {
+          console.error('初始化今日上货统计失败:', error);
+        }
+        this.todayLoadCount = 0;
+        return;
+      }
+      this.todayLoadCount = count;
+    },
+    incrementTodayLoadCount() {
+      const current = this.readTodayLoadFile();
+      const next = (current == null ? 0 : current) + 1;
+      try {
+        this.writeTodayLoadFile(next);
+      } catch (error) {
+        console.error('写入今日上货统计失败:', error);
+      }
+      this.todayLoadCount = next;
+    },
+    resetTodayLoadCount() {
+      const previous = this.todayLoadCount;
+      try {
+        this.writeTodayLoadFile(0);
+      } catch (error) {
+        console.error('清空今日上货统计失败:', error);
+      }
+      this.todayLoadCount = 0;
+      return previous;
+    },
     // 应用业务配置：仅覆盖与旧逻辑相关的分拣口容量与扫码模式（无关计时类配置不处理）
     applyBizConfig(cfg) {
       if (!cfg) return;
@@ -3005,6 +3091,7 @@ export default {
 
         // 5. 写入目的地 DB1001.DBW8
         ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', destinationCode);
+        this.incrementTodayLoadCount();
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
         }, 1000);
@@ -4241,11 +4328,12 @@ export default {
             this.sixScanBarcode = '';
             this.lastProcessedBarcode = '';
             this.lastAllocPortNo = 0; // 分拣口循环下发游标重置，下次从分拣口1开始
+            const clearedLoadCount = this.resetTodayLoadCount();
             this.runningLogs = []; // 修改为空数组
             this.alarmLogs = []; // 修改为空数组
             this.nowTrays = [];
             this.$message.success('全线清空成功');
-            this.addLog('全线清空成功');
+            this.addLog(`全线清空成功，今日上货 ${clearedLoadCount} 件已清零`);
           })
           .catch(() => {
             // 用户取消操作，不做任何处理
@@ -4973,6 +5061,10 @@ export default {
               box-sizing: border-box;
               height: 65px;
               width: 185px;
+            }
+            .data-card--today {
+              grid-column: 1 / -1;
+              width: 100%;
             }
 
             .data-card-border {
