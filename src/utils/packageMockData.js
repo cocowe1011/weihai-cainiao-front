@@ -21,7 +21,7 @@ export function mapCainiaoToPackage(data, barcode) {
     packageCreateTime: '',
     sourceWarehouse: '',
     chargeWeight:
-      data && data.standardWeight != null ? String(data.standardWeight) : '',
+      data && data.grossWeight != null ? String(data.grossWeight) : '',
     packingWeight:
       data && data.packingWeight != null ? String(data.packingWeight) : '',
     expectedQty: qty,

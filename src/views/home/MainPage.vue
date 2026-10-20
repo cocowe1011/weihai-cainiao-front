@@ -3125,6 +3125,7 @@ export default {
           trayTime: moment().format('YYYY-MM-DD HH:mm:ss'),
           channel: packageInfo.channel,
           packageSize: packageInfo.packageSize, // 记录包裹大小，用于分拣口同大小约束判断
+          chargeWeight: packageInfo.chargeWeight || '',
           packingWeight: packageInfo.packingWeight,
           expectedQty: packageInfo.expectedQty,
           trayStatus: '1',
@@ -3616,7 +3617,13 @@ export default {
             materialDataCode: pkgNo,
             attributeList: [
               { attributeCode: 'trackingNumber', attributeValue: pkgNo },
-              { attributeCode: 'weight', attributeValue: '0' },
+              {
+                attributeCode: 'weight',
+                attributeValue:
+                  tray.chargeWeight != null && String(tray.chargeWeight) !== ''
+                    ? String(tray.chargeWeight)
+                    : '0'
+              },
               { attributeCode: 'channel', attributeValue: tray.channel || '' }
             ]
           };
