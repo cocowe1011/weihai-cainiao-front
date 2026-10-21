@@ -2939,6 +2939,7 @@ export default {
     },
     // 目的地请求处理入口（DBW16.bit0上升沿触发）
     // 不再依赖 sixScanBarcode watch 缓存，直接拿当前条码进行判断和mock处理
+    // 处理结束后清空本次消费的条码，避免下一次目的地请求复用
     async handleDestinationRequest() {
       // PDA扫码模式：不依赖六面扫条码，从PDA扫码队列(id=17)取队头处理
       if (this.scanMode === 2) {
@@ -2946,100 +2947,110 @@ export default {
         return;
       }
       const barcode = (this.sixScanBarcode || '').trim();
+      const displayBarcode = this.lastProcessedBarcode;
+      try {
+        // 1. 条码为空
+        if (!barcode) {
+          ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
+          setTimeout(() => {
+            ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+          }, 1000);
+          this.addLog(
+            '收到目的地请求信号，但当前无条码数据，目的地写999',
+            'alarm'
+          );
+          return;
+        }
 
-      // 1. 条码为空
-      if (!barcode) {
-        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
-        setTimeout(() => {
-          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
-        }, 1000);
-        this.addLog(
-          '收到目的地请求信号，但当前无条码数据，目的地写999',
-          'alarm'
-        );
-        return;
-      }
+        // 2. NoRead 判断（关键字识别）
+        if (barcode.indexOf('NoRead') !== -1) {
+          ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
+          setTimeout(() => {
+            ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+          }, 1000);
+          this.addLog(
+            `收到目的地请求信号，六面扫未读到条码（${barcode}），报警：条码无效，目的地写999`,
+            'alarm'
+          );
+          return;
+        }
 
-      // 2. NoRead 判断（关键字识别）
-      if (barcode.indexOf('NoRead') !== -1) {
-        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
-        setTimeout(() => {
-          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
-        }, 1000);
-        this.addLog(
-          `收到目的地请求信号，六面扫未读到条码（${barcode}），报警：条码无效，目的地写999`,
-          'alarm'
-        );
-        return;
-      }
+        // 3. 多码判断（逗号分隔）
+        const parts = barcode.split(',');
+        if (parts.length > 1) {
+          ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
+          setTimeout(() => {
+            ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+          }, 1000);
+          this.addLog(
+            `收到目的地请求信号，六面扫读到多个条码（${barcode}），报警：条码无效，目的地写999`,
+            'alarm'
+          );
+          return;
+        }
+        // 多码判断：[xxxx][xxxx] 格式
+        const bracketMatches = barcode.match(/\[[^\]]*\]/g);
+        if (bracketMatches && bracketMatches.length >= 2) {
+          ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
+          setTimeout(() => {
+            ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+          }, 1000);
+          this.addLog(
+            `收到目的地请求信号，六面扫读到多码格式条码（${barcode}），报警：条码无效，目的地写999`,
+            'alarm'
+          );
+          return;
+        }
 
-      // 3. 多码判断（逗号分隔）
-      const parts = barcode.split(',');
-      if (parts.length > 1) {
-        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
-        setTimeout(() => {
-          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
-        }, 1000);
-        this.addLog(
-          `收到目的地请求信号，六面扫读到多个条码（${barcode}），报警：条码无效，目的地写999`,
-          'alarm'
-        );
-        return;
-      }
-      // 多码判断：[xxxx][xxxx] 格式
-      const bracketMatches = barcode.match(/\[[^\]]*\]/g);
-      if (bracketMatches && bracketMatches.length >= 2) {
-        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
-        setTimeout(() => {
-          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
-        }, 1000);
-        this.addLog(
-          `收到目的地请求信号，六面扫读到多码格式条码（${barcode}），报警：条码无效，目的地写999`,
-          'alarm'
-        );
-        return;
-      }
+        // 4. 单码重复检测：查1008队列和1010队列中是否已有同 packageNo 的条目
+        const dupQ1010 = this.queues.find((q) => q.id === 15);
+        const dupCheckQueues = [
+          { queue: this.queues[0], name: '1008' },
+          { queue: dupQ1010, name: '1010' }
+        ];
+        for (const { queue, name } of dupCheckQueues) {
+          if (!queue) continue;
+          const existingIndex = queue.trayInfo.findIndex(
+            (item) => item.packageNo === barcode
+          );
+          if (existingIndex === -1) continue;
+          // 重复包裹：直接写目的地999，1秒后取消，不再重新入队
+          ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
+          setTimeout(() => {
+            ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+          }, 1000);
+          this.addLog(
+            `目的地请求：条码重复（${name}队列已存在同条码），已写目的地999（1秒后取消），条码：${barcode}`,
+            'alarm'
+          );
+          return;
+        }
 
-      // 4. 单码重复检测：查1008队列和1010队列中是否已有同 packageNo 的条目
-      const dupQ1010 = this.queues.find((q) => q.id === 15);
-      const dupCheckQueues = [
-        { queue: this.queues[0], name: '1008' },
-        { queue: dupQ1010, name: '1010' }
-      ];
-      for (const { queue, name } of dupCheckQueues) {
-        if (!queue) continue;
-        const existingIndex = queue.trayInfo.findIndex(
-          (item) => item.packageNo === barcode
-        );
-        if (existingIndex === -1) continue;
-        // 重复包裹：直接写目的地999，1秒后取消，不再重新入队
-        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
-        setTimeout(() => {
-          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
-        }, 1000);
-        this.addLog(
-          `目的地请求：条码重复（${name}队列已存在同条码），已写目的地999（1秒后取消），条码：${barcode}`,
-          'alarm'
-        );
-        return;
+        // 5. 获取包裹数据（停用菜鸟走 mock，否则查菜鸟接口）
+        const packageInfo = await this.resolvePackageInfo(barcode);
+        if (!packageInfo) {
+          ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
+          setTimeout(() => {
+            ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+          }, 1000);
+          this.addLog(
+            `菜鸟查询未成功，已写目的地999，终止后续分配与落库，条码：${barcode}`,
+            'alarm'
+          );
+          this.$message.error('菜鸟大包查询失败，已发送999');
+          return;
+        }
+        this.nowScanTrayInfo = packageInfo;
+        await this.allocateAndDispatch(packageInfo, barcode);
+      } finally {
+        // 只清本次请求消费的条码；查询期间若已扫入新码则保留
+        if ((this.sixScanBarcode || '').trim() === barcode) {
+          this.sixScanBarcode = '';
+        }
+        if (this.lastProcessedBarcode === displayBarcode) {
+          this.lastProcessedBarcode = '';
+        }
       }
-
-      // 5. 获取包裹数据（停用菜鸟走 mock，否则查菜鸟接口）
-      const packageInfo = await this.resolvePackageInfo(barcode);
-      if (!packageInfo) {
-        ipcRenderer.send('writeSingleValueToPLC', 'W_DBW8', 999);
-        setTimeout(() => {
-          ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
-        }, 1000);
-        this.addLog(
-          `菜鸟查询未成功，已写目的地999，终止后续分配与落库，条码：${barcode}`,
-          'alarm'
-        );
-        this.$message.error('菜鸟大包查询失败，已发送999');
-        return;
-      }
-      this.nowScanTrayInfo = packageInfo;
-      await this.allocateAndDispatch(packageInfo, barcode);
     },
     // 分配分拣口并下发：写PLC目的地/虚拟ID → 保存订单 → 入1008队列（五面扫与PDA扫码模式共用，统一在下发时落库）
     async allocateAndDispatch(packageInfo, barcode) {
