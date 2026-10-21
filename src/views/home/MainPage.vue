@@ -1339,7 +1339,7 @@
                       </div>
                       <div class="tray-info-row">
                         <span class="tray-detail"
-                          >包装重量：{{ tray.packingWeight || '--' }}</span
+                          >毛重：{{ tray.chargeWeight || '--' }}</span
                         >
                         <span class="tray-detail"
                           >小包数量：{{ tray.expectedQty || '--' }}</span
@@ -3796,6 +3796,7 @@ export default {
           trayTime: it.scanTime,
           channel: it.channel,
           packageSize: it.packageSize,
+          chargeWeight: it.chargeWeight,
           packingWeight: it.packingWeight,
           expectedQty: it.expectedQty,
           trayStatus: '1'
@@ -4435,7 +4436,7 @@ export default {
               name: packageNo ? `大包 ${packageNo}` : '未知大包',
               time: tray.trayTime || '',
               channel: tray.channel || '',
-              packingWeight: tray.packingWeight || '',
+              chargeWeight: tray.chargeWeight || '',
               expectedQty: tray.expectedQty || '',
               allocatedPortNo: tray.allocatedPortNo || '',
               destinationCode: tray.destinationCode || ''
