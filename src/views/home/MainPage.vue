@@ -2400,6 +2400,51 @@ export default {
       if (!newVal || !newVal.trim()) return;
       this.handleM1010Change(newVal.trim());
     },
+    // 普通口1~11：PLC计数达到容量后，再对比队列数量
+    'sortPortPlcCounts.1'(newVal) {
+      if (!this.isDataReady) return;
+      this.onNormalPortPlcCount(1, newVal);
+    },
+    'sortPortPlcCounts.2'(newVal) {
+      if (!this.isDataReady) return;
+      this.onNormalPortPlcCount(2, newVal);
+    },
+    'sortPortPlcCounts.3'(newVal) {
+      if (!this.isDataReady) return;
+      this.onNormalPortPlcCount(3, newVal);
+    },
+    'sortPortPlcCounts.4'(newVal) {
+      if (!this.isDataReady) return;
+      this.onNormalPortPlcCount(4, newVal);
+    },
+    'sortPortPlcCounts.5'(newVal) {
+      if (!this.isDataReady) return;
+      this.onNormalPortPlcCount(5, newVal);
+    },
+    'sortPortPlcCounts.6'(newVal) {
+      if (!this.isDataReady) return;
+      this.onNormalPortPlcCount(6, newVal);
+    },
+    'sortPortPlcCounts.7'(newVal) {
+      if (!this.isDataReady) return;
+      this.onNormalPortPlcCount(7, newVal);
+    },
+    'sortPortPlcCounts.8'(newVal) {
+      if (!this.isDataReady) return;
+      this.onNormalPortPlcCount(8, newVal);
+    },
+    'sortPortPlcCounts.9'(newVal) {
+      if (!this.isDataReady) return;
+      this.onNormalPortPlcCount(9, newVal);
+    },
+    'sortPortPlcCounts.10'(newVal) {
+      if (!this.isDataReady) return;
+      this.onNormalPortPlcCount(10, newVal);
+    },
+    'sortPortPlcCounts.11'(newVal) {
+      if (!this.isDataReady) return;
+      this.onNormalPortPlcCount(11, newVal);
+    },
     // 异常口12、PLC计数变化：达到最大容量直接呼叫AGV（不校验队列数量一致）
     'sortPortPlcCounts.12'(newVal) {
       if (!this.isDataReady) return;
@@ -3452,19 +3497,6 @@ export default {
         `大包 ${entryId} 已从${sourceQueue.queueName}移入${targetQueue.queueName}（当前 ${targetQueue.trayInfo.length} 件）`
       );
       this.$message.success(`大包 ${entryId} 已进入${targetQueue.queueName}`);
-
-      // 分拣口队列达到最大容量时，触发满容量判断（对比PLC计数与队列数量）
-      // 异常口固定容量不区分大小件；通用口按口内包裹大小取统一配置（大包/小包容量不同）
-      const portConfig = this.sortPortConfig.find((p) => p.portNo === portNo);
-      const isExceptionPort = portConfig && portConfig.sizeType === 'exception';
-      const maxCapacity = isExceptionPort
-        ? this.exceptionPortCapacity
-        : this.getPortCapacity(
-            this.getQueuePackageSize(targetQueue) || movedTray.packageSize
-          );
-      if (targetQueue.trayInfo.length >= maxCapacity) {
-        this.handleSortPortFull(portNo);
-      }
     },
     // ========== AGV/MCS 相关方法 ==========
     // 手动呼叫AGV：弹出确认后直接呼叫AGV取货（不做计数校验）
@@ -3480,6 +3512,14 @@ export default {
         .catch(() => {
           this.$message.info('已取消呼叫AGV');
         });
+    },
+    // 普通口（1~11）PLC计数变化：达到容量后，再对比队列数量
+    onNormalPortPlcCount(portNo, plcCount) {
+      const queue = this.queues[portNo];
+      if (!queue || queue.isLock === '1') return;
+      const maxCapacity = this.getPortCapacity(this.getQueuePackageSize(queue));
+      if ((plcCount || 0) < maxCapacity) return;
+      this.handleSortPortFull(portNo);
     },
     // 异常口（12、13）PLC计数变化处理：达到最大容量且未锁定时，触发直接呼叫AGV
     onExceptionPortPlcCount(portNo, plcCount) {
