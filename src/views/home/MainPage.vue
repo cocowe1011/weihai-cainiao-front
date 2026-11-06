@@ -3922,7 +3922,7 @@ export default {
       return item ? item.packageSize : '';
     },
     // 分拣口分配算法（1~11通用口，不区分大小件）
-    // 同渠道且同大小的未满口优先续放；否则按 1→11 顺序循环开新空口
+    // 同渠道且同大小的未满口优先续放；否则按口号从小到大取前面的空口
     // 一口一渠道、一口一大小（大包配大包、小包配小包）
     allocateSortPort(packageSize, channel) {
       const channelKey = (channel || '').trim();
@@ -3992,24 +3992,10 @@ export default {
         return sameChannelPartial[0].port;
       }
 
-      // 优先级2：空闲分拣口，按 1→11 顺序循环开新空口（大小包共用游标）
+      // 优先级2：空闲分拣口，按口号从小到大优先取前面的空口
       const empty = portLoads.filter((p) => p.currentLoad === 0);
-      if (empty.length === 0) {
-        return null;
-      }
-      const portNos = candidates.map((p) => p.portNo);
-      let startIdx = portNos.indexOf(this.lastAllocPortNo);
-      if (startIdx < 0) {
-        startIdx = -1;
-      }
-      for (let i = 1; i <= portNos.length; i++) {
-        const idx = (startIdx + i) % portNos.length;
-        const portNo = portNos[idx];
-        const found = empty.find((e) => e.port.portNo === portNo);
-        if (found) {
-          this.lastAllocPortNo = portNo;
-          return found.port;
-        }
+      if (empty.length > 0) {
+        return empty[0].port;
       }
       return null;
     },
