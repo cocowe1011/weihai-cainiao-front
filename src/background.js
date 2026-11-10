@@ -136,10 +136,26 @@ let logBufferTimer = null;
 const LOG_BUFFER_SIZE = 10; // 缓冲区大小
 const LOG_FLUSH_INTERVAL = 5000; // 5秒刷新一次
 
+// 数字补零辅助
+function padZero(n, len) {
+  return String(n).padStart(len, '0');
+}
+
+// 手动格式化时间戳（精确到毫秒），避免 toLocaleString 的 ICU 开销
+function formatLogTimestamp(now) {
+  const date =
+    `${now.getFullYear()}-${padZero(now.getMonth() + 1, 2)}-` +
+    `${padZero(now.getDate(), 2)}`;
+  const time =
+    `${padZero(now.getHours(), 2)}:${padZero(now.getMinutes(), 2)}:` +
+    `${padZero(now.getSeconds(), 2)}.${padZero(now.getMilliseconds(), 3)}`;
+  return `${date} ${time}`;
+}
+
 // 优化的日志写入函数
 function writeLogToLocalOptimized(logData) {
-  // 添加时间戳
-  const timestamp = new Date().toLocaleString();
+  // 添加时间戳（精确到毫秒，手动格式化以避免 ICU 开销）
+  const timestamp = formatLogTimestamp(new Date());
   const logEntry = `[${timestamp}] ${logData}\n`;
 
   // 添加到缓冲区
