@@ -1025,6 +1025,44 @@
                     class="conveyor-arrow-item"
                   ></div>
                 </div>
+                <!-- 1007再次发送：展示PLC读到的虚拟ID，以及最近一次成功下发 -->
+                <div class="marker-with-panel" data-x="280" data-y="1200">
+                  <div
+                    class="data-panel resend-panel"
+                    :class="['position-top', { 'always-show': true }]"
+                  >
+                    <div class="data-panel-header">重新发送1007命令</div>
+                    <div class="data-panel-content">
+                      <div class="resend-field">
+                        <span class="resend-label">1007虚拟ID</span>
+                        <span class="resend-value">{{
+                          beltStationIds.M1007 || '--'
+                        }}</span>
+                      </div>
+                      <div class="resend-field">
+                        <span class="resend-label">下发虚拟ID</span>
+                        <span class="resend-value">{{
+                          lastSentVirtualId || '--'
+                        }}</span>
+                      </div>
+                      <div class="resend-field">
+                        <span class="resend-label">下发目的地</span>
+                        <span class="resend-value">{{
+                          lastSentDestinationCode === ''
+                            ? '--'
+                            : lastSentDestinationCode
+                        }}</span>
+                      </div>
+                      <button
+                        class="resend-btn"
+                        :disabled="!lastSentVirtualId"
+                        @click="resendLastDestination"
+                      >
+                        重新发送
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <!-- 六面扫扫码上货面板（PDA扫码模式下屏蔽） -->
                 <div
                   v-if="scanMode !== 2"
@@ -2217,11 +2255,15 @@ export default {
       sortPort11TrayId: '',
       sortPort12TrayId: '',
       sortPort13TrayId: '',
-      // 各皮带工位虚拟ID（DB1000.DBB748-1137）01008~01020）
+      // 各皮带工位虚拟ID（DB1000.DBB718-808）01007~01010）
       beltStationIds: {
+        M1007: '',
         M1008: '',
         M1010: ''
       },
+      // 最近一次目的地请求成功下发的虚拟ID与目的地编码
+      lastSentVirtualId: '',
+      lastSentDestinationCode: '',
       // PLC分拣口计数（DBW1224~DBW1248，对应分拣口1~13）
       sortPortPlcCounts: {
         1: 0,
@@ -2656,7 +2698,8 @@ export default {
       safeSet(this, 'sortPort12TrayId', values.DBB628);
       safeSet(this, 'sortPort13TrayId', values.DBB658);
 
-      // 各皮带工位虚拟ID（DB1000.DBB748-808）
+      // 各皮带工位虚拟ID（DB1000.DBB718-808）
+      safeSet(this.beltStationIds, 'M1007', values.DBB718);
       safeSet(this.beltStationIds, 'M1008', values.DBB748);
       safeSet(this.beltStationIds, 'M1010', values.DBB808);
 
@@ -3157,6 +3200,8 @@ export default {
         setTimeout(() => {
           ipcRenderer.send('cancelWriteToPLC', 'W_DBB10');
         }, 1000);
+        this.lastSentVirtualId = barcode;
+        this.lastSentDestinationCode = destinationCode;
         this.addLog(
           `分配分拣口${port.portNo}（${
             packageSize === 'large' ? '大包' : '小包'
@@ -3212,6 +3257,26 @@ export default {
         );
         return false;
       }
+    },
+    // 按最近一次成功下发，重新写虚拟ID和目的地编码
+    resendLastDestination() {
+      const virtualId = (this.lastSentVirtualId || '').trim();
+      if (!virtualId || this.lastSentDestinationCode === '') return;
+      ipcRenderer.send(
+        'writeSingleValueToPLC',
+        'W_DBW8',
+        this.lastSentDestinationCode
+      );
+      setTimeout(() => {
+        ipcRenderer.send('cancelWriteToPLC', 'W_DBW8');
+      }, 1000);
+      ipcRenderer.send('writeSingleValueToPLC', 'W_DBB10', virtualId);
+      setTimeout(() => {
+        ipcRenderer.send('cancelWriteToPLC', 'W_DBB10');
+      }, 1000);
+      this.addLog(
+        `1007再次发送：已重新写入虚拟ID ${virtualId}，目的地编码 ${this.lastSentDestinationCode}`
+      );
     },
     // PDA扫码模式目的地请求：实时取PDA扫码队列(id=17)队头，分配下发后出队
     async handlePdaDestinationRequest() {
@@ -5703,6 +5768,14 @@ export default {
                   border-radius: 8px;
                   padding: 12px;
                   width: 170px;
+                  &.resend-panel {
+                    width: 120px;
+                    .data-panel-header {
+                      font-size: 12px;
+                      margin-bottom: 6px;
+                      padding-bottom: 4px;
+                    }
+                  }
                   // box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
                   opacity: 0;
                   transition: all 0.3s ease;
@@ -5924,6 +5997,53 @@ export default {
                       background: rgba(64, 158, 255, 0.3);
                       border-color: rgba(64, 158, 255, 0.6);
                       color: #409eff;
+                    }
+
+                    .resend-field {
+                      display: flex;
+                      flex-direction: column;
+                      gap: 1px;
+                      margin-bottom: 5px;
+                      padding-bottom: 4px;
+                      border-bottom: 1px solid rgba(64, 158, 255, 0.15);
+                    }
+
+                    .resend-label {
+                      font-size: 10px;
+                      line-height: 1.2;
+                      color: rgba(255, 255, 255, 0.5);
+                    }
+
+                    .resend-value {
+                      font-size: 11px;
+                      line-height: 1.3;
+                      color: rgba(255, 255, 255, 0.95);
+                      word-break: break-all;
+                    }
+
+                    .resend-btn {
+                      width: 100%;
+                      margin-top: 2px;
+                      background: #1a6fbf;
+                      border: 1px solid #2f86d6;
+                      color: #ffffff;
+                      border-radius: 4px;
+                      padding: 3px 0;
+                      font-size: 11px;
+                      line-height: 1.4;
+                      cursor: pointer;
+                    }
+
+                    .resend-btn:hover:not(:disabled) {
+                      background: #2180db;
+                      border-color: #4b9be4;
+                    }
+
+                    .resend-btn:disabled {
+                      background: #2a3544;
+                      border-color: #3a4656;
+                      color: rgba(255, 255, 255, 0.35);
+                      cursor: not-allowed;
                     }
                   }
                 }

@@ -595,7 +595,8 @@ function conPLC() {
           conn.addItems('DBB598'); // 分拣口11进货ID
           conn.addItems('DBB628'); // 分拣口12进货ID
           conn.addItems('DBB658'); // 分拣口13进货ID
-          // 各皮带工位虚拟ID（DB1000.DBB748-808）
+          // 各皮带工位虚拟ID（DB1000.DBB718-808）
+          conn.addItems('DBB718'); // M1007工位ID
           conn.addItems('DBB748'); // M1008工位ID
           conn.addItems('DBB808'); // M1010工位ID
           // 分拣口计数（DB1000.DBW1224-1248，每段INT）
@@ -706,7 +707,8 @@ var variables = {
   DBB598: 'DB1000,S598.28', // 分拣口11进货ID
   DBB628: 'DB1000,S628.28', // 分拣口12进货ID
   DBB658: 'DB1000,S658.28', // 分拣口13进货ID
-  // —— 各皮带工位虚拟ID（DB1000.DBB748-808，每段 char(30)）——
+  // —— 各皮带工位虚拟ID（DB1000.DBB718-808，每段 char(30)）——
+  DBB718: 'DB1000,S718.28', // M1007工位ID
   DBB748: 'DB1000,S748.28', // M1008工位ID
   DBB808: 'DB1000,S808.28', // M1010工位ID
   // —— 分拣口计数（DB1000.DBW1224-1248，每段INT）——
